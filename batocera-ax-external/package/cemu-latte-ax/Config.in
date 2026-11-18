@@ -1,0 +1,6 @@
+config BR2_PACKAGE_CEMU_LATTE_AX
+	bool "cemu-latte-ax"
+	select BR2_PACKAGE_AX_SDK
+	help
+	  Cemu Latte [AX] Nintendo Wii U Emulator.
+	  https://github.com
