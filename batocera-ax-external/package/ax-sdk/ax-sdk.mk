@@ -1,0 +1,15 @@
+################################################################################
+#
+# ax-sdk
+#
+################################################################################
+
+AX_SDK_VERSION = main
+AX_SDK_SITE = https://github.com
+AX_SDK_SITE_METHOD = git
+AX_SDK_LICENSE = MIT
+AX_SDK_LICENSE_FILES = LICENSE
+AX_SDK_INSTALL_STAGING = YES
+AX_SDK_INSTALL_TARGET = NO
+
+$(eval $(cmake-package))
