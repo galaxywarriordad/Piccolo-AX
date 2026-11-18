@@ -1,0 +1,6 @@
+config BR2_PACKAGE_EDEN_AX
+	bool "eden-ax"
+	select BR2_PACKAGE_AX_SDK
+	help
+	  Eden Espresso Wave [AX] Nintendo Switch Emulator.
+	  https://github.com
