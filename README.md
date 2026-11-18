@@ -1,3 +1,8 @@
+---
+
+### 2. `Piccolo-AX/README.md`
+
+```markdown
 # 🎛️ Piccolo [AX] — Bare-Metal Real-Time Console OS
 
 A deterministic, `< 300 MB` bare-metal Linux console appliance built on **Batocera Linux** (`BR2_EXTERNAL`)—engineered by **The Silicon Preservation Society** to keep proven PC hardware out of landfills.
@@ -10,10 +15,10 @@ Piccolo `[AX]` strips away desktop bloat and runs directly in system RAM (`toram
 
 | Project | Role | Primary Repository | Mirror / Upstream |
 | :--- | :--- | :--- | :--- |
-| **Piccolo `[AX]`** | `< 300 MB` Bare-Metal Linux Console OS | [GitHub (`Piccolo-AX`)](https://github.com) | Base: [Batocera Linux](https://github.com) |
-| **`ax-sdk`** | Shared C++20 Runtime Core (`libax_core`) | [GitHub (`ax-sdk`)](https://github.com) | Dependency-Free Core |
-| **Eden Espresso Wave `[AX]`** | Nintendo Switch (Windows 10 Bridge + Linux) | [Eden Forgejo](https://eden-emu.dev) | Mirror: [GitHub](https://github.com) · Upstream: [Eden](https://eden-emu.dev) |
-| **Cemu Latte `[AX]`** | Nintendo Wii U (Win10 PGO + Batocera `[AX]`) | [GitHub (`Cemu-Latte-AX`)](https://github.com) | Upstream: [Cemu](https://github.com) |
+| **Piccolo `[AX]`** | `< 300 MB` Bare-Metal Linux Console OS | [GitHub (`Piccolo-AX`)](https://github.com/galaxywarriordad/Piccolo-AX) | Base: [Batocera Linux](https://github.com/batocera-linux/batocera.linux) |
+| **`ax-sdk`** | Shared C++20 Runtime Core (`libax_core`) | [GitHub (`ax-sdk`)](https://github.com/galaxywarriordad/ax-sdk) | Dependency-Free Core |
+| **Eden Espresso Wave `[AX]`** | Nintendo Switch (Windows 10 Bridge + Linux) | [Eden Forgejo](https://git.eden-emu.dev/galaxywarriordad/Eden-Espresso-Wave-AX.git) | Mirror: [GitHub](https://github.com/galaxywarriordad/Eden-Espresso-Wave-AX) · Upstream: [Eden](https://git.eden-emu.dev/eden-emu/eden/) |
+| **Cemu Latte `[AX]`** | Nintendo Wii U (Win10 PGO + Batocera `[AX]`) | [GitHub (`Cemu-Latte-AX`)](https://github.com/galaxywarriordad/Cemu-Latte-AX) | Upstream: [Cemu](https://github.com/cemu-project/Cemu) |
 
 ---
 
@@ -40,11 +45,6 @@ Piccolo-AX/
 │   └── board/piccolo-ax/   # Rootfs overlay (S01piccolo-isolate, ALSA, IRQ rules)
 ├── patches/                # Pinned upstream Batocera Linux patches
 └── scripts/                # Build orchestrator & verify_ax_appliance.sh gate
-```
 
----
-
-## 🤝 License & Acknowledgements
-
-Licensed under **GPL-3.0** (`LICENSE`). Built on [Batocera Linux](https://github.com) and Buildroot. Contains no proprietary console firmware, keys, or games.
-
+🤝 License & Acknowledgements
+Licensed under GPL-3.0 (LICENSE). Built on Batocera Linux and Buildroot. Contains no proprietary console firmware, keys, or games.
