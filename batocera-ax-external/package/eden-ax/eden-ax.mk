@@ -5,7 +5,7 @@
 ################################################################################
 
 EDEN_AX_VERSION = master
-EDEN_AX_SITE = https://github.com
+EDEN_AX_SITE = https://git.eden-emu.dev/galaxywarriordad/Eden-Espresso-Wave-AX.git
 EDEN_AX_SITE_METHOD = git
 EDEN_AX_GIT_SUBMODULES = YES
 EDEN_AX_LICENSE = GPL-3.0-or-later
