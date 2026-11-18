@@ -1,0 +1,27 @@
+#!/bin/sh
+# K01piccolo-sync — Atomic zstd -3 cache & PGO flush on exit/shutdown
+
+case "$1" in
+  stop)
+    echo "[Piccolo-AX] Flushing RAM shader caches & PGO profiles atomically..."
+    killall -TERM vmtouch 2>/dev/null || true
+    mkdir -p /userdata/cache /userdata/pgo
+
+    if [ -d /dev/shm/eden_cache ] && [ "$(ls -A /dev/shm/eden_cache 2>/dev/null)" ]; then
+        tar -I "zstd -3" -cf /userdata/cache/eden_cache.tar.zst.tmp -C /dev/shm/eden_cache .
+        sync
+        mv -f /userdata/cache/eden_cache.tar.zst.tmp /userdata/cache/eden_cache.tar.zst
+    fi
+
+    if [ -d /dev/shm/nv_cache ] && [ "$(ls -A /dev/shm/nv_cache 2>/dev/null)" ]; then
+        tar -I "zstd -3" -cf /userdata/cache/nv_cache.tar.zst.tmp -C /dev/shm/nv_cache .
+        sync
+        mv -f /userdata/cache/nv_cache.tar.zst.tmp /userdata/cache/nv_cache.tar.zst
+    fi
+
+    sync
+    ;;
+  start)
+    ;;
+esac
+exit 0
