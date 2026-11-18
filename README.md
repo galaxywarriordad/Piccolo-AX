@@ -31,7 +31,8 @@ Whereas `Eden-Espresso-Wave-AX` serves as the Windows 10/11 desktop development 
 
 ## 📚 Appliance & Architecture Specifications
 
-* [Piccolo Linux Appliance Specification (`docs/EDEN_PICCOLO_SPEC.md`)](docs/EDEN_PICCOLO_SPEC.md)
+* [Piccolo Linux Appliance Specification (`docs/PICOLLO_AX_SPEC.md`)](docs/PICOLLO_AX_SPEC.md)
+* [Piccolo Implementation Plan (`docs/IMPLEMENTATION_PLAN.md`)](docs/IMPLEMENTATION_PLAN.md)
 * [Unified Dual-Target Master Plan (`ax-sdk`)](https://github.com/galaxywarriordad/ax-sdk/blob/main/docs/UNIFIED_MASTER_PLAN.md)
 * [Unified Multi-Architecture Silicon Topology Plan (`ax-sdk`)](https://github.com/galaxywarriordad/ax-sdk/blob/main/docs/SILICON_TOPOLOGY_PLAN.md)
 
