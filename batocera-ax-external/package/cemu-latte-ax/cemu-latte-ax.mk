@@ -5,7 +5,7 @@
 ################################################################################
 
 CEMU_LATTE_AX_VERSION = main
-CEMU_LATTE_AX_SITE = https://github.com
+CEMU_LATTE_AX_SITE = https://github.com/galaxywarriordad/Cemu-Latte-AX.git
 CEMU_LATTE_AX_SITE_METHOD = git
 CEMU_LATTE_AX_GIT_SUBMODULES = YES
 CEMU_LATTE_AX_LICENSE = MPL-2.0
