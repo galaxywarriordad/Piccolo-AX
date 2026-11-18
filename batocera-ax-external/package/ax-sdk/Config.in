@@ -1,0 +1,5 @@
+config BR2_PACKAGE_AX_SDK
+	bool "ax-sdk"
+	help
+	  Shared C++20 Deterministic Emulation Core (libax_core).
+	  https://github.com
