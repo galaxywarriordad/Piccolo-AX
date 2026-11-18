@@ -1,8 +1,3 @@
----
-
-### 2. `Piccolo-AX/README.md`
-
-```markdown
 # 🎛️ Piccolo [AX] — Bare-Metal Real-Time Console OS
 
 A deterministic, `< 300 MB` bare-metal Linux console appliance built on **Batocera Linux** (`BR2_EXTERNAL`)—engineered by **The Silicon Preservation Society** to keep proven PC hardware out of landfills.
