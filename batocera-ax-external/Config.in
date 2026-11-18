@@ -1,0 +1,39 @@
+menu "Piccolo [AX] Console Appliance"
+
+config BR2_PACKAGE_AX_SDK
+	bool "ax-sdk (libax_core)"
+	default y
+	help
+	  Shared dependency-free C++20 deterministic hardware runtime
+	  for The Silicon Preservation Society emulators.
+
+config BR2_PACKAGE_EDEN_AX
+	bool "Eden Espresso Wave [AX] (Nintendo Switch)"
+	default y
+	select BR2_PACKAGE_AX_SDK
+	help
+	  Deterministic Nintendo Switch emulator compiled with standalone
+	  Clang 23.1+ (ThinLTO + 3-Phase PGO) and linked against ax-sdk.
+
+config BR2_PACKAGE_CEMU_LATTE_AX
+	bool "Cemu Latte [AX] (Nintendo Wii U)"
+	default y
+	select BR2_PACKAGE_AX_SDK
+	help
+	  Deterministic Nintendo Wii U emulator compiled with standalone
+	  Clang 23.1+ (ThinLTO + 3-Phase PGO) and linked against ax-sdk.
+
+config BR2_PACKAGE_LSFG_VK
+	bool "lsfg-vk 2.0.0+ (Implicit Vulkan Frame Generation)"
+	default y
+	help
+	  Vulkan 1.2 bindless FP32 frame-generation layer (requires user-supplied
+	  Lossless.dll placed in /userdata/system/lsfg/Lossless.dll).
+
+config BR2_PACKAGE_VMTOUCH
+	bool "vmtouch (MAP_POPULATE RAM Asset Pinner)"
+	default y
+	help
+	  Bulk pre-faults filtered game containers into DDR4 RAM (-dql).
+
+endmenu
