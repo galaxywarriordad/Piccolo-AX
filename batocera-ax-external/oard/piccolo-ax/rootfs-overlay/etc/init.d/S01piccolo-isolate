@@ -1,0 +1,43 @@
+#!/bin/sh
+# S01piccolo-isolate — Early cgroup v2 isolation, IRQ quarantine & zram valve
+
+case "$1" in
+  start)
+    echo "[Piccolo-AX] Configuring cgroup v2 isolated domain (Cores 0-4)..."
+    mkdir -p /sys/fs/cgroup/eden.slice
+    echo "+cpuset" > /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null || true
+    echo "0-4" > /sys/fs/cgroup/eden.slice/cpuset.cpus
+    echo "0" > /sys/fs/cgroup/eden.slice/cpuset.mems
+    echo "isolated" > /sys/fs/cgroup/eden.slice/cpuset.cpus.partition 2>/dev/null || true
+
+    # Quarantine unbound kernel workqueues & default IRQs to Core 5 (0x20)
+    echo 20 > /sys/devices/virtual/workqueue/cpumask 2>/dev/null || true
+    echo 20 > /proc/irq/default_smp_affinity 2>/dev/null || true
+
+    # Memory & low-latency kernel sysctls
+    sysctl -w vm.swappiness=1 >/dev/null
+    sysctl -w vm.max_map_count=1048576 >/dev/null
+    ulimit -l unlimited
+
+    # 512 MB LZ4 zram emergency compression valve pinned to Core 5
+    if [ -b /dev/zram0 ]; then
+        taskset -c 5 zramctl /dev/zram0 --algorithm lz4 --size 512M
+        mkswap /dev/zram0 >/dev/null
+        swapon -p 100 /dev/zram0
+    fi
+
+    # Enforce pcie_aspm=off & lock GTX 980 Ti power state
+    if [ -e /sys/bus/pci/devices/0000:01:00.0/power/control ]; then
+        echo "on" > /sys/bus/pci/devices/0000:01:00.0/power/control
+    fi
+
+    # Pre-mount e2fsck on journal-free SHARE partition
+    SHARE_DEV=$(blkid -L SHARE 2>/dev/null || true)
+    if [ -n "$SHARE_DEV" ]; then
+        e2fsck -p "$SHARE_DEV" >/dev/null 2>&1 || true
+    fi
+    ;;
+  stop)
+    ;;
+esac
+exit 0
