@@ -1,16 +1,16 @@
-# ⚡ Eden Piccolo [AX] — Deterministic Appliance Architecture, Engineering Review & Build Guide (v0.5)
+# ⚡ Eden Piccolo [AX] — Deterministic Appliance Architecture, Engineering Review & Build Guide (v0.6)
 
 > *"Full espresso punch, zero bulky milk—concentrated deterministic Switch emulation on a pocket-sized Samsung USB 3.0 drive."*
 
-* **Document Version:** v0.5 (Reconciled Reference Architecture + 5-Lens Engineering Review, Synced to MASTER v1.34)
-* **Upstream Lineage:** Eden Espresso Wave [AX] (`MASTER v1.34` baseline via `batocera-ax-external/` `BR2_EXTERNAL` overlay)
+* **Document Version:** v0.6 (Reconciled Reference Architecture + 5-Lens Engineering Review, Synced to `ax-sdk v1.35.0` & `Eden-Espresso-Wave-AX` Vulkan 1.4 Async VRAM Shield)
+* **Upstream Lineage:** Eden Espresso Wave [AX] (`MASTER v1.35` baseline via `batocera-ax-external/` `BR2_EXTERNAL` overlay + `ax-sdk v1.35.0` shared C++20 silicon core)
 * **Target Boot Appliance Medium:** Samsung FIT Plus 64 GB USB 3.1 Gen 1 Flash Drive (Model: `MUF-64AB/APC`, Gunmetal / Steel Grey — up to 400 MB/s read, 60 MB/s write)
-* **Target Host Silicon & Memory:** Intel Core i5-9600K (`6C/6T`, Zero SMT, `x49` / `4.9 GHz` Core 0, `x48` / `4.8 GHz` Cores 1–5, `x45` / `4.5 GHz` Uncore Ring Lock, 9 MB L3 Smart Cache) · 32 GB Dual-Channel DDR4-3600 (`VCCSA/VCCIO 1.15–1.20V`) · NVIDIA GeForce GTX 980 Ti (6 GB GDDR5, Maxwell GM200, Driver `580.*` Legacy LTS) + Intel UHD Graphics 630 iGPU (`0x8086`) · HiBy FC3 USB DAC (ESS Sabre ES9281AC Pro)
-* **Project Status:** Pre-Implementation Architectural Specification (Ready for Sprint 0 Live USB Hardware Gate & Buildroot Scaffolding)
+* **Target Host Silicon & Memory:** Intel Core i5-9600K (`6C/6T`, Zero SMT, `x48` / `4.8 GHz` locked symmetrically across all Cores 0–5 to avoid Vcore spikes, `x45` / `4.5 GHz` Uncore Ring Lock, 9 MB L3 Smart Cache) · 32 GB Dual-Channel DDR4-3600 (`VCCSA/VCCIO 1.15–1.20V`) · NVIDIA GeForce GTX 980 Ti (6 GB GDDR5, Maxwell GM200, Driver `580.*` Legacy LTS, Vulkan 1.4) + Intel UHD Graphics 630 iGPU (`0x8086`) · HiBy FC3 USB DAC (ESS Sabre ES9281AC Pro)
+* **Project Status:** Active Implementation (`ax-sdk v1.35.0` & Vulkan 1.4 Async `VK_QUEUE_TRANSFER_BIT` VRAM Shield Integrated; Ready for Live USB Hardware Gate)
 * **Cross-Document References:**
-  * `ARCHITECTURE_SPEC.md` — Eden Espresso Wave [AX] Comprehensive Architectural Specification (`MASTER v1.34`)
-  * `EDEN_BACKLOG.md` — Eden Espresso Wave [AX] Master Product & Engineering Backlog (`v1.34 → v2.00`)
-  * `EDEN_PICCOLO_WORKPACKAGE.md` — Eden Piccolo [AX] Master Implementation Plan & Workpackage (`v0.5`)
+  * `ARCHITECTURE_SPEC.md` — Eden Espresso Wave [AX] Comprehensive Architectural Specification (`MASTER v1.35`)
+  * `EDEN_BACKLOG.md` — Eden Espresso Wave [AX] Master Product & Engineering Backlog (`v1.35 → v2.00`)
+  * `EDEN_PICCOLO_WORKPACKAGE.md` — Eden Piccolo [AX] Master Implementation Plan & Workpackage (`v0.6`)
 
 ---
 
@@ -21,7 +21,7 @@
 3. [End-to-End Silicon, Ring Bus, Core & Dual-xHCI Isolation Topology](#3--end-to-end-silicon-ring-bus-core--dual-xhci-isolation-topology)
 4. [Calibrated 32 GB DDR4-3600 Memory Map, HugePages & Smart Container Filtering](#4--calibrated-32-gb-ddr4-3600-memory-map-hugepages--smart-container-filtering)
 5. [Hybrid BC3/BC7 Texture Pipeline, Option C RGBA8 & Dual-GPU Video Offload](#5--hybrid-bc3bc7-texture-pipeline-option-c-rgba8--dual-gpu-video-offload)
-6. [Linux C++ / Vulkan Platform Shims (`src/`) & Upstream PR Parity](#6--linux-c--vulkan-platform-shims-src--upstream-pr-parity)
+6. [Shared `ax-sdk` & Linux C++ / Vulkan 1.4 Platform Shims (`src/`)](#6--shared-ax-sdk--linux-c--vulkan-14-platform-shims-src)
 7. [Batocera `BR2_EXTERNAL` Appliance Overlay, Init Hooks & RootFS Pruning](#7--batocera-br2_external-appliance-overlay-init-hooks--rootfs-pruning)
 8. [Five-Lens Deep-Dive Engineering Design Review & Risk Audit](#8--five-lens-deep-dive-engineering-design-review--risk-audit)
 9. [Phased Integration Roadmap, Timeframes & End-to-End PGO Build Checklist](#9--phased-integration-roadmap-timeframes--end-to-end-pgo-build-checklist)
@@ -35,26 +35,26 @@
 
 Deterministic architecture replaces general-purpose best-effort desktop scheduling with strict, hardware-locked execution guarantees. While desktop operating systems dynamically migrate threads, fire timer ticks, and pause for background services, **Eden Piccolo [AX]** enforces:
 
-* **Fixed Spatial Boundaries:** Physical CPU cores are partitioned via `cgroups v2` (`cpuset.cpus.partition = isolated`), tickless kernels (`nohz_full=0-4`), and offloaded RCU callbacks (`rcu_nocbs=0-4`) to eradicate scheduler jitter and L1/L2/L3 cache pollution.
+* **Fixed Spatial Boundaries (`CoreRatio=2:3:1`):** Physical CPU cores are partitioned via `ax-sdk` (`ax::topology`), `cgroups v2` (`cpuset.cpus.partition = isolated`), tickless kernels (`nohz_full=0-4`), and offloaded RCU callbacks (`rcu_nocbs=0-4`) to eradicate scheduler jitter and L1/L2/L3 cache pollution.
 * **1:1 Cache-Local Interrupt & Bus Alignment:** Hardware MSI interrupts bind directly to the exact physical core consuming their data, eliminating cross-core IPIs and L3 cache-line invalidations.
-* **Bounded-Latency Memory & VRAM:** Page-table walk stalls and PCIe swap thrashing are eliminated using boot-reserved `1 GB` and `2 MB` HugePages, RAM-resident `toram` execution, pre-faulted `vmtouch` asset buffers, and hard VBLANK-polled VRAM ceilings.
+* **Bounded-Latency Memory & Proactive Async VRAM Pruning:** Page-table walk stalls and PCIe swap thrashing are eliminated using boot-reserved `1 GB` and `2 MB` HugePages, RAM-resident `toram` execution, pre-faulted `vmtouch` asset buffers, and a **proactive `5.00 GiB` (`kPruneTriggerBytes`) asynchronous `VK_QUEUE_TRANSFER_BIT` VRAM reaper** (`VkVramShield`).
 
-Nintendo Switch emulation is acutely sensitive to tail micro-stutters rather than average frame rates: a single background preemption or storage IRQ spike can starve a `2.00–2.67 ms` USB DAC audio buffer or drop a VBLANK frame-pacing deadline. While **Eden Espresso Wave [AX] (`MASTER v1.34`)** achieves this on Windows 10 via registry hardening, `SeLockMemoryPrivilege`, MMCSS Pro Audio elevation, and process affinity masks, **Eden Piccolo [AX]** eliminates the desktop OS entirely—booting an immutable, `< 300 MB` RAM-resident `PREEMPT_RT` Linux appliance from a pocket-sized USB 3.0 drive.
+Nintendo Switch emulation is acutely sensitive to tail micro-stutters rather than average frame rates: a single background preemption, synchronous VBLANK memory free, or storage IRQ spike can starve a `2.00–2.67 ms` USB DAC audio buffer or drop a VBLANK frame-pacing deadline. While **Eden Espresso Wave [AX] (`MASTER v1.35`)** achieves this on Windows 10 via registry hardening, `SeLockMemoryPrivilege`, `HIGH` + MMCSS Pro Audio elevation, and `ax-sdk` spatial masks, **Eden Piccolo [AX]** eliminates the desktop OS entirely—booting an immutable, `< 300 MB` RAM-resident `PREEMPT_RT` Linux appliance from a pocket-sized USB 3.0 drive.
 
 ### 1.2 🛠️ What We Are Planning to Build
 
-**Eden Piccolo [AX]** is an out-of-tree `BR2_EXTERNAL` Buildroot overlay (`batocera-ax-external/`) built atop Batocera Linux. Every non-Switch emulator, background desktop daemon, window manager, and user-space audio server (`PipeWire`/`PulseAudio`) is stripped out. The entire OS resides as a `< 300 MB` read-only **EROFS (`lz4hc,9`)** image on a **Samsung FIT Plus 64 GB USB 3.1 Gen 1 Flash Drive (`MUF-64AB/APC`)**, copying sequentially into DDR4-3600 RAM in `~0.75 seconds` at boot (`toram` with `rootfs.erofs.prev` A/B fallback) so the USB drive sits 100% idle during gameplay.
+**Eden Piccolo [AX]** is an out-of-tree `BR2_EXTERNAL` Buildroot overlay (`batocera-ax-external/`) built atop Batocera Linux and linked against the standalone MIT-licensed **`ax-sdk`** C++20 silicon runtime (`ax::core`). Every non-Switch emulator, background desktop daemon, window manager, and user-space audio server (`PipeWire`/`PulseAudio`) is stripped out. The entire OS resides as a `< 300 MB` read-only **EROFS (`lz4hc,9`)** image on a **Samsung FIT Plus 64 GB USB 3.1 Gen 1 Flash Drive (`MUF-64AB/APC`)**, copying sequentially into DDR4-3600 RAM in `~0.75 seconds` at boot (`toram` with `rootfs.erofs.prev` A/B fallback) so the USB drive sits 100% idle during gameplay.
 
 ### 1.3 📊 Architectural Comparison: Eden Espresso Wave [AX] vs. Eden Piccolo [AX]
 
-| Architectural Pillar | Eden Espresso Wave [AX] (`Windows 10 — MASTER v1.34`) | Eden Piccolo [AX] (`Batocera USB 3.0 Appliance — v0.5`) |
+| Architectural Pillar | Eden Espresso Wave [AX] (`Windows 10 — MASTER v1.35`) | Eden Piccolo [AX] (`Batocera USB 3.0 Appliance — v0.6`) |
 | :--- | :--- | :--- |
 | **OS Footprint & Boot** | 1.8–3.5 GB Windows 10 + DWM + background services | `< 300 MB` EROFS (`lz4hc,9`) copied to RAM at `initrd` (`toram`, `mitigations=off`, `~0.75s` boot, A/B `.prev` rollback) |
-| **CPU Core Isolation** | Win32 `SetThreadAffinityMask` (`2:3:1` Elastic Mask; kernel DPCs still intrude) | `cgroups v2` `cpuset.cpus.partition = isolated` + `isolcpus=managed_irq,domain,0-4` + `nohz_full=0-4` + `rcu_nocbs=0-4` |
+| **CPU Core Isolation** | `ax::topology` (`CoreRatio=2:3:1`) + `HIGH` & MMCSS Pro Audio (prevents USB xHCI IRQ starvation) | `ax::topology` (`CoreRatio=2:3:1`) + `cgroups v2` `isolated` + `isolcpus=managed_irq,domain,0-4` + `nohz_full=0-4` + `rcu_nocbs=0-4` |
 | **HugePages & Fastmem** | `SeLockMemoryPrivilege` + `VirtualAlloc(MEM_LARGE_PAGES)` (2 MB) | Hybrid **`6.0 GB` (1G DTLB)** + **`2.0 GB` (2M)** HugePages (`8.0 GB` total) + `mmap(MAP_HUGETLB)` + `mlockall()` |
-| **Bit-Perfect Audio** | FlexASIO / WASAPI Exclusive (128 samples / 2.67 ms) + MMCSS Pro Audio | Unified Core 0 loop: Direct ALSA `hw:CARD=FC3,DEV=0` (`S32_LE`, `96` smp / `2.00 ms` w/ `128` fallback) + HiBy FC3 xHCI IRQ (`itr=0`) |
-| **VRAM Ceiling Shield** | `IDXGIAdapter3::QueryVideoMemoryInfo` 5.5 GB VBLANK gate | `VK_EXT_memory_budget` + `VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT` (`5.5 GB` cap / `5.35 GB` w/ `lsfg-vk 2.0.0+`) |
-| **GM200 Silicon Fastpaths** | Runtime PCI ID flags (`5.7`): `FP16 → FP32` promotion, async DMA, `BAR1` WC pool | Runtime `GM200` flags (`5.7`): `FP16 → FP32` shader promotion (`5.10`), `VK_QUEUE_TRANSFER_BIT` (`6.8`), `BAR1` WC pool (`6.9`), `SHFL` (`7.7`) |
+| **Bit-Perfect Audio** | FlexASIO / WASAPI Exclusive (`WIN32`-gated in CMake, 128 smp / 2.67 ms) + MMCSS Pro Audio | Unified Core 0 loop: Direct ALSA `hw:CARD=FC3,DEV=0` (`S32_LE`, `96` smp / `2.00 ms` w/ `128` fallback) + HiBy FC3 xHCI IRQ (`itr=0`) |
+| **Async VRAM Shield** | `ax::vram` **`5.00 GiB` async prune trigger** + `VkVramShield` (`VK_QUEUE_TRANSFER_BIT` + `vkCmdSetEvent2`/`WaitEvents2`) | `ax::vram` **`5.00 GiB` async prune trigger** (`~4.50 GiB` hysteresis recovery) + `VkVramShield` (`5.50 GiB` / `5.35 GiB` w/ `lsfg-vk 2.0.0+`) |
+| **GM200 Silicon Fastpaths** | Runtime PCI ID flags (`5.7`): `FP16 → FP32` promotion, dedicated `VK_QUEUE_TRANSFER_BIT`, `BAR1` WC pool | Runtime `GM200` flags (`5.7`): `FP16 → FP32` shader promotion (`5.10`), dedicated `VK_QUEUE_TRANSFER_BIT` (`6.8`), `BAR1` WC pool (`6.9`), `SHFL` (`7.7`) |
 | **Texture Pipeline** | Hybrid BC3/BC7 + Option C `< 4.5 GB` lossless RGBA8 | VBLANK-gated Maxwell async compute ASTC → BC3/BC7 (Core 5 SIMD fallback) + Option C `< 4.5 GB` RGBA8 per-title toggle |
 | **Frame Generation** | Native Win32 `Lossless.dll` DXGI / WinRT WGC swapchain hook | Implicit Vulkan Layer **`lsfg-vk 2.0.0+`** (Vulkan 1.2 bindless, FP32 mode, BYO licensed Steam `Lossless.dll`) |
 | **iGPU Video Offload** | Media Foundation / Intel QSV + `IDXGIResource1` NT Shared Handle | Intel UHD 630 VA-API (`iHD`) → `DRM_FORMAT_MOD_LINEAR` `dma_buf` FD → `VkImageDrmFormatModifierListCreateInfoEXT` |
@@ -72,11 +72,12 @@ Nintendo Switch emulation is acutely sensitive to tail micro-stutters rather tha
 * **Zero-Runtime-Write Strategy:** To avoid the 60 MB/s NAND write ceiling and eliminate flash wear during active gameplay, runtime writes to the USB drive are completely prohibited:
   * At `initrd` stage, the `< 300 MB` EROFS rootfs is copied sequentially (`bs=4M`, with automatic fallback to `rootfs.erofs.prev`) into a RAM `tmpfs` block in `~0.75s`.
   * Active shader caches (`EdenCache` + `__GL_SHADER_DISK_CACHE_PATH=/dev/shm/nv_cache`), AOT blocks, logs, and PGO `.profraw` traces reside strictly in DDR4-3600 `tmpfs` (`1.5 GB`).
-  * On game exit or shutdown, `/etc/init.d/K01piccolo-sync` and `edenGenerator.py` pack dirty cache data into contiguous **`zstd -3`** archives written atomically (`.tar.zst.tmp` → `sync` → `mv -f`) at full `60 MB/s` sequential throughput.
+  * On game exit or shutdown, `/etc/init.d/K01piccolo-sync` and `axGenerator.py` pack dirty cache data into contiguous **`zstd -3`** archives written atomically (`.tar.zst.tmp` → `sync` → `mv -f`) at full `60 MB/s` sequential throughput.
 
 ### 2.2 🗂️ Hybrid Split-Filesystem Partition Layout
 
 | Partition | Size & Filesystem | Mount Point & Options | Contents & Engineering Safeguards |
+
 | :--- | :--- | :--- | :--- |
 | **1. `BATOCERA`** | `4.0 GB` `FAT32` | `/boot` (`ro,noatime`) | UEFI bootloaders, multi-core GRUB config (`mitigations=off`), mainline **Linux `6.12.x-rt`** `bzImage`, and immutable `< 300 MB` **EROFS (`lz4hc,9`)** rootfs image (`rootfs.erofs` + A/B fallback `rootfs.erofs.prev`). |
 | **2. `SHARE`** | `~55.6 GB` `ext4` (journal disabled) | `/userdata` (`rw,noatime,commit=60`) | Formatted with `mkfs.ext4 -O ^has_journal` to eliminate metadata write amplification; stores `eden_engine.ini`, `eden.profdata`, and per-title `.tar.zst` `EdenCache` + `nv_cache` archives. **Protected at boot by mandatory `e2fsck -p` inside `S01piccolo-isolate`.** |
