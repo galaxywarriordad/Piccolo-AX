@@ -141,16 +141,20 @@ Before launching `vmtouch -dql` from `SwitchHDD`, `edenGenerator.py` inspects `.
 
 ## 5. 🎨 Hybrid BC3/BC7 Texture Pipeline, Option C RGBA8 & Dual-GPU Video Offload
 
-### 5.1 🖼️ Adaptive VRAM Shield & GM200 Silicon Pipeline (`GTX 980 Ti` 6 GB GDDR5)
+### 5.1 🖼️ Proactive `5.00 GiB` Async VRAM Shield & GM200 Silicon Pipeline (`GTX 980 Ti` 6 GB GDDR5)
 
-Because the Maxwell GM200 lacks native hardware ASTC decoding and runs FP16 at a **1:64** rate relative to FP32, Piccolo combines **Option C lossless detection**, **runtime `GM200` capability flags (`5.7`)**, and **VBLANK-gated GPU compute transcoding**:
+Because the Maxwell GM200 lacks native hardware ASTC decoding and runs FP16 at a **1:64** rate relative to FP32, Piccolo combines **Option C lossless detection**, **runtime `GM200` capability flags (`5.7`)**, **VBLANK-gated GPU compute transcoding**, and an **asynchronous `VK_QUEUE_TRANSFER_BIT` + Vulkan 1.4 Synchronization2 split-barrier VRAM reaper (`VkVramShield`)**:
 
 * **GM200 `FP16 → FP32` Shader Promotion & Compute ASTC Default (`5.10`):** When runtime PCI ID detection (`5.7`) identifies Maxwell `GM200`, `emit_spirv.cpp` automatically promotes Switch `FP16`/`mediump` ALU operations to native `FP32` (eliminating half-precision ALU stalls) and defaults ASTC decompression to GPU compute shaders across GM200's 2,816 CUDA cores to protect `0x1C` CPU headroom.
-* **Dedicated `VK_QUEUE_TRANSFER_BIT` & `256 MB BAR1` WC Fastpath (`6.8` & `6.9`):** Binds GM200's second hardware DMA copy engine (`VK_QUEUE_TRANSFER_BIT`) with split `VK_KHR_synchronization2` barriers to overlap texture uploads with 3D rasterization, and carves a bounded sub-pool out of GM200's `256 MB BAR1` `HOST_VISIBLE | DEVICE_LOCAL` Write-Combined aperture for small per-frame Switch UBOs and dynamic index buffers.
-* **Option C Hybrid Uncompressed RGBA8 Tier (`< 4.5 GB` VRAM Footprint):** For lighter titles whose total uncompressed texture + framebuffer footprint stays safely under `4.5 GB`, `edenGenerator.py` enables per-title lossless RGBA8 mode, preserving native Switch visual fidelity with zero compression artifacts.
+* **Dedicated `VK_QUEUE_TRANSFER_BIT` Discovery & `256 MB BAR1` WC Fastpath (`6.8` & `6.9`):** `Vulkan::Device::SetupFamilies()` scans queue families to isolate GM200's dedicated hardware DMA copy engine (`VK_QUEUE_TRANSFER_BIT` without `VK_QUEUE_GRAPHICS_BIT`, exposed via `device.GetTransferQueue()` / `device.HasDedicatedTransferQueue()` with automatic `graphics_family` fallback), overlapping texture transfers with 3D rasterization alongside a bounded sub-pool carved out of GM200's `256 MB BAR1` `HOST_VISIBLE | DEVICE_LOCAL` Write-Combined aperture.
+* **Proactive `5.00 GiB` Async Split-Barrier VRAM Shield (`ax::vram` + `VkVramShield`):**
+  * **Zero-Stall VBLANK Poll (Core 1):** During `RasterizerVulkan::TickFrame()`, `VkVramShield::TickVblank()` queries `device.GetDeviceMemoryUsage()` (`VK_EXT_memory_budget`) and calls `ax::vram::EvaluateBudget(current_usage, lsfg_active, IsEvictionInFlight())`.
+  * **Proactive `5.00 GiB` Trigger (`kPruneTriggerBytes = 5,368,709,120` bytes):** Rather than waiting until the `5.50 GiB` (`5.35 GiB` with `lsfg-vk 2.0.0+`) hard ceiling—and never blocking VBLANK with synchronous `vmaDestroyImage` / `vkDestroyImage` calls—eviction triggers asynchronously at **`5.00 GiB`** with a **`~4.50 GiB` hysteresis recovery target** and an atomic `eviction_in_flight` guard.
+  * **Vulkan 1.4 Synchronization2 Split Barrier + Core 5 Reaper:** Core 1 records a non-blocking `vkCmdSetEvent2` → `vkCmdWaitEvents2` split barrier (`VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT` → `VK_PIPELINE_STAGE_2_TRANSFER_BIT`), submits a `VK_KHR_timeline_semaphore` ticket on `device.GetTransferQueue()`, and signals a dedicated `std::jthread` worker pinned to **Core 5 (`ax::topology::Domain::Housekeeping`)** to release detached `VmaAllocation` / `VkImage` handles completely off the VBLANK critical path.
+  * **Emergency Hard-Ceiling Guardrail:** If a sudden allocation spike reaches the `5.50 GiB` (`5.35 GiB` LSFG) ceiling before the async worker finishes draining, `snapshot.force_lod_downscale` engages immediately.
+* **Option C Hybrid Uncompressed RGBA8 Tier (`< 4.5 GB` VRAM Footprint):** For lighter titles whose total uncompressed texture + framebuffer footprint stays safely under `4.5 GB`, `axGenerator.py` enables per-title lossless RGBA8 mode, preserving native Switch visual fidelity with zero compression artifacts.
 * **VBLANK-Gated Async Compute ASTC → BC3/BC7 Transcoding:** For heavy titles (`>= 4.5 GB` uncompressed), raw ASTC blocks upload into a compact `2M` HugePage staging ring and transcode in parallel on the GTX 980 Ti into **BC3** (`1.0 BPP` active baseline) or **BC7/BC6H** (`1.0 BPP` Phase 3 parity) directly in VRAM—cutting PCIe upload traffic in half and keeping active VRAM between **2.2 GB and 3.2 GB**.
-  * *Maxwell Single-Engine Guardrail:* Because Maxwell GM200 time-slices compute and graphics on a single engine, `vk_vram_shield.hpp` gates GPU compute transcoding to loading screens and VBLANK slack windows, dynamically routing ASTC transcoding to **Core 5 AVX2 SIMD** whenever `lsfg-vk` frame generation is active (`frame_time > 12.0 ms`).
-* **Dual-Layer VRAM Ceiling Enforcement (`vk_vram_shield.hpp`):** Combines `VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT` inside `VmaAllocator` with VBLANK `VK_EXT_memory_budget` polling (`5.5 GB` standard ceiling; **`5.35 GB` ceiling when `lsfg-vk 2.0.0+` bindless FP32 mode is active**), triggering `texture_reaper.cpp` `< 64 KB` defragmentation passes before Maxwell can spill into system RAM.
+  * *Maxwell Single-Engine Guardrail:* Because Maxwell GM200 time-slices compute and graphics on a single engine, GPU compute transcoding is gated to loading screens and VBLANK slack windows, dynamically routing ASTC transcoding to **Core 5 AVX2 SIMD** whenever `lsfg-vk` frame generation is active (`frame_time > 12.0 ms`).
 
 ### 5.2 🎬 Zero-Copy Intel UHD 630 → GTX 980 Ti Video Bridge (`vaapi_dmabuf_bridge.hpp`)
 
@@ -160,28 +164,32 @@ Because the Maxwell GM200 lacks native hardware ASTC decoding and runs FP16 at a
 
 ---
 
-## 6. ⚙️ Linux C++ / Vulkan Platform Shims (`src/`) & Upstream PR Parity
+## 6. ⚙️ Shared `ax-sdk` & Linux C++ / Vulkan 1.4 Platform Shims (`src/`)
 
-All Linux-native hardware bindings live behind `#ifdef __linux__` guards inside `src/` to maintain a unified C++20 codebase with Windows `MASTER v1.34`:
+All silicon-policy logic lives in the MIT-licensed **`ax-sdk`** (`ax::core`) library consumed via CMake `FetchContent` / Buildroot `package/ax-sdk/`, while Linux-native hardware bindings live behind `#ifdef __linux__` guards inside `src/` to maintain a unified C++20 codebase with Windows `MASTER v1.35`:
 
 ### 6.1 🧩 Core Platform & Hardware Shims
 
-1. **`src/common/ax_platform_shim.hpp` (Unified Core 0 Audio, HugePages & Closed-Loop Governor):**
+1. **`ax-sdk` (`include/ax/{topology,memory,vram,igpu,audio}.hpp`):**
+   * **`ax::vram` (`v1.35.0`):** Exposes `kPruneTriggerBytes` (`5.00 GiB`), `kDefaultCeilingBytes` (`5.50 GiB`), `kLsfgCeilingBytes` (`5.35 GiB`), `kWin32LsCeilingBytes` (`5.20 GiB`), and `EvaluateBudget(usage, lsfg, eviction_in_flight)` with `~4.50 GiB` recovery hysteresis.
+   * **`ax::topology`:** Enforces `CoreRatio=2:3:1` domain pinning (`AudioTiming`, `VulkanSubmission`, `GuestJit`, `Housekeeping`), Linux `/dev/cpu/0/msr` (`0xc8f`) CAT availability detection, and Windows `HIGH` + MMCSS `Pro Audio` elevation.
+   * **`ax::memory` & `ax::igpu`:** Provides `MAP_HUGE_1GB` / `MAP_HUGE_2MB` HugeTLB fastmem allocation, `_bextr_u64` BMI1 helpers, `_MM_HINT_NTA` non-temporal streaming hints, and `DRM_FORMAT_MOD_LINEAR` `dma_buf` bandwidth guardrails (`3.50 GB/s`).
+2. **`src/video_core/renderer_vulkan/vk_vram_shield.hpp`, `vulkan_device.cpp` & `vulkan_wrapper.cpp`:**
+   * Discovers dedicated `VK_QUEUE_TRANSFER_BIT` hardware queues (`device.GetTransferQueue()`), loads Vulkan 1.4 `vkCmdSetEvent2` / `vkCmdWaitEvents2` (with `KHR` fallbacks), and runs `Vulkan::VkVramShield` (`TickVblank` on Core 1 + `VK_KHR_timeline_semaphore`-fenced `std::jthread` reaper on Core 5).
+3. **`src/common/ax_platform_shim.hpp` (Unified Core 0 Audio & Closed-Loop Governor):**
    * Pins the fused `CoreTiming` + `AudioCore` + `SCHED_FIFO 99` ALSA feeder loop (`hw:CARD=FC3,DEV=0`, `SND_PCM_FORMAT_S32_LE`, `48 kHz`, `96-frame / 2.00 ms` default period with automatic `128-frame / 2.67 ms` xrun fallback + `libswresample` micro-pitch PLL `±0.005%`) to **Core 0 (`0x01`)**.
-   * Maps `1 GB` and `2 MB` HugePages via `mmap(..., MAP_HUGETLB | MAP_HUGE_1GB / MAP_HUGE_2MB)` + `mlockall(MCL_CURRENT | MCL_FUTURE)`.
    * Implements the **closed-loop `clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME)` + `_mm_pause()`** sub-microsecond frame-pacing governor driven by lock-free `g_metrics` atomic counters.
    * Runs the `SCHED_FIFO 80` `/dev/hidraw*` VBLANK-aligned (`-1.5 ms` phase latch + `Select+Start` 1.5s exit hook) controller poller and `/dev/ttyACM0` 3.5" telemetry writer on **Core 5 (`0x20`)**.
-2. **`src/video_core/renderer_vulkan/vk_vram_shield.hpp` & `vk_device.cpp`:**
-   * Enforces the `5.5 GB` / `5.35 GB` (`lsfg-vk 2.0.0+`) `VK_EXT_memory_budget` ceiling, `VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT` tracking, `texture_reaper.cpp` eviction passes, and runtime `GM200` capability flags (`5.7`, `5.10`, `6.8`, `6.9`).
-3. **`src/video_core/host1x/vaapi_dmabuf_bridge.hpp`:**
+4. **`src/video_core/host1x/vaapi_dmabuf_bridge.hpp`:**
    * Manages Intel `iHD` VA-API session creation, `DRM_FORMAT_MOD_LINEAR` `dma_buf` export, and `VkImageDrmFormatModifierListCreateInfoEXT` Vulkan import on the GTX 980 Ti.
 
-### 6.2 🛡️ Maxwell GM200 Safety Guards & Upstream PR Parity (`MASTER v1.34`)
+### 6.2 🛡️ Maxwell GM200 Safety Guards & Upstream PR Parity (`MASTER v1.35`)
 
 * **Maxwell Descriptor, Subresource & Page Guards (`Citron PR #449, #383, #4688, #385, #447, #448`):** Enforces `(addr & YUZU_PAGEMASK) + size <= YUZU_PAGESIZE` contiguity checks on `vk_ubo_passthrough.cpp` / `dma_ring_bridge.cpp`, clamps GTX 980 Ti `maxPushDescriptors` with null-descriptor fallbacks, bounds `VkImageSubresourceRange` mip/layer counts in `vk_texture_cache.cpp`, and short-circuits zero-vertex procedural draws (`gl_VertexIndex`).
 * **Register-Pressure (`lmem`) Spill Guard & Native `SHFL` Reductions (`emit_spirv.cpp` — `7.3` & `7.7`):** Condenses SPIR-V temporary live ranges and emits native `VK_KHR_shader_subgroup_arithmetic` / `vote` 32-thread warp shuffle instructions (`SHFL`) instead of shared-memory (`LDS`) fallbacks so complex shaders stay within Maxwell's hardware register file instead of spilling into GDDR5 local memory (`lmem`).
 * **FFmpeg Core 5 Slice Quarantine & AVX2 Audio (`nvdec.h`, `vp8.cpp`, `vp9.cpp`):** Routes any software decode fallback slices strictly into Core 5's `PipelineWorkerPoolRing` (`0x20`) and enables AVX2 FIR resampling + `SWR_DITHER_TRIANGULAR_HIGHPASS` in `libswresample`.
 * **64-Bit Pipeline Key Condensation, Biquad Guard & Memory Leak Fix (`Eden PR #4819, #4210, #3817, #2`):** Compresses `FixedPipelineState` into Skylake L1/L2 cache lines, guards `BiquadFilterEffectCommand` coefficients on Core 0, and includes PR #3817 (`HeapTracker` removal) to guarantee zero host RAM leaks over multi-hour sessions.
+
 
 ---
 
