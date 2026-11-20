@@ -8,6 +8,9 @@ case "$1" in
     cat << 'EOF' > /etc/modprobe.d/piccolo-audio.conf
 options snd-usb-audio nrpacks=1 lowlatency=1
 EOF
+    if lsmod | grep -q "^snd_usb_audio"; then
+        modprobe -r snd_usb_audio 2>/dev/null && modprobe snd_usb_audio 2>/dev/null || true
+    fi
 
     # Bind GTX 980 Ti MSI IRQ to Core 1 (0x02)
     for irq in $(grep -i "nvidia" /proc/interrupts | awk -F: '{print $1}' | tr -d ' '); do
@@ -26,12 +29,12 @@ EOF
     # Enable NVIDIA persistence mode (580.* legacy branch)
     nvidia-smi -pm 1 >/dev/null 2>&1 || true
 
-    # Stage RAM tmpfs shader directories
-    mkdir -p /dev/shm/eden_cache /dev/shm/nv_cache
+    # Stage RAM tmpfs shader & PGO directories
+    mkdir -p /dev/shm/emu_cache /dev/shm/nv_cache /dev/shm/pgo
 
     # Mount SwitchHDD asynchronously on Core 5 so spin-up never blocks boot
-    mkdir -p /userdata/roms
-    taskset -c 5 sh -c 'mount -L SwitchHDD -o ro,noatime /userdata/roms 2>/dev/null || true' &
+    mkdir -p /userdata/roms/switch /userdata/roms/wiiu /userdata/roms/n64
+    taskset -c 5 sh -c 'mount -L SwitchHDD -o ro,noatime /userdata/roms/switch 2>/dev/null || true' &
     ;;
   stop)
     ;;
