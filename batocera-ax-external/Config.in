@@ -23,6 +23,27 @@ config BR2_PACKAGE_CEMU_LATTE_AX
 	  Deterministic Nintendo Wii U emulator compiled with standalone
 	  Clang 23.1+ (ThinLTO + 3-Phase PGO) and linked against ax-sdk.
 
+config BR2_PACKAGE_RMG_AX
+	bool "RMG-Mupen [AX] (Nintendo 64)"
+	default y
+	select BR2_PACKAGE_AX_SDK
+	select BR2_PACKAGE_QT6BASE_GUI
+	select BR2_PACKAGE_QT6BASE_WIDGETS
+	select BR2_PACKAGE_QT6BASE_OPENGL
+	select BR2_PACKAGE_QT6BASE_VULKAN
+	select BR2_PACKAGE_QT6SVG
+	select BR2_PACKAGE_QT6WEBSOCKETS
+	select BR2_PACKAGE_SDL3
+	select BR2_PACKAGE_LIBSAMPLERATE
+	select BR2_PACKAGE_SPEEXDSP
+	select BR2_PACKAGE_LIBUSB
+	select BR2_PACKAGE_HIDAPI
+	select BR2_PACKAGE_MINIZIP
+	select BR2_PACKAGE_FREETYPE
+	select BR2_PACKAGE_VULKAN_HEADERS
+	help
+	  Deterministic Nintendo 64 emulator (Rosalie's Mupen GUI) linked against ax-sdk.
+
 config BR2_PACKAGE_LSFG_VK
 	bool "lsfg-vk 2.0.0+ (Implicit Vulkan Frame Generation)"
 	default y
