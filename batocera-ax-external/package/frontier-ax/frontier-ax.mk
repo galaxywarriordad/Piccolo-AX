@@ -5,7 +5,7 @@
 ################################################################################
 
 FRONTIER_AX_VERSION = master
-FRONTIER_AX_SITE = https://github.com/watsonmw/fe2-intro.git
+FRONTIER_AX_SITE = https://github.com/pcercuei/glfrontier.git
 FRONTIER_AX_SITE_METHOD = git
 FRONTIER_AX_LICENSE = Reverse-Engineered / Non-Commercial
 FRONTIER_AX_LICENSE_FILES = README.md
