@@ -88,3 +88,12 @@ config BR2_PACKAGE_VMTOUCH
 	  Bulk pre-faults filtered game containers into DDR4 RAM (-dql).
 
 endmenu
+```[cite: 8]
+
+*Verification:* After pasting and committing `frontier-ax.mk`, run a Buildroot dry-run or package build (`make frontier-ax-source` / `make frontier-ax`) and confirm `as68k/as68k` runs on the host and `$(TARGET_DIR)/usr/bin/frontier-fe2` is created.
+
+<ElicitationsGroup message="If you hit a build error when testing frontier-ax in Buildroot:">
+  <Elicitation label="Missing library error" query="Buildroot failed linking frontier-ax due to a missing library flag. Which library is missing?"/>
+  <Elicitation label="as68k build issue" query="Building as68k failed in frontier-ax. How should I fix the as68k build step?"/>
+  <Elicitation label="Missing Buildroot package" query="Buildroot reported a missing package in FRONTIER_AX_DEPENDENCIES. Which dependency should I adjust?"/>
+</ElicitationsGroup>
