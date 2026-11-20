@@ -9,7 +9,9 @@ FRONTIER_AX_SITE = https://github.com/pcercuei/glfrontier.git
 FRONTIER_AX_SITE_METHOD = git
 FRONTIER_AX_LICENSE = Reverse-Engineered / Non-Commercial
 FRONTIER_AX_LICENSE_FILES = README.md
-FRONTIER_AX_PKGDIR = $(TOPDIR)/../batocera-ax-external/package/frontier-ax
+
+FRONTIER_AX_EXT_DIR := $(if $(BR2_EXTERNAL_BATOCERA_AX_PATH),$(BR2_EXTERNAL_BATOCERA_AX_PATH),$(TOPDIR)/../batocera-ax-external)
+FRONTIER_AX_PKGDIR := $(FRONTIER_AX_EXT_DIR)/package/frontier-ax
 
 FRONTIER_AX_DEPENDENCIES = \
 	ax-sdk \
@@ -32,7 +34,7 @@ define FRONTIER_AX_BUILD_CMDS
 		SDL_CFLAGS="$$($(STAGING_DIR)/usr/bin/sdl2-config --cflags 2>/dev/null || true)" \
 		SDL_LIBS="$$($(STAGING_DIR)/usr/bin/sdl2-config --libs 2>/dev/null || echo '-lSDL2')" \
 		CFLAGS="$(TARGET_CFLAGS) -I$(FRONTIER_AX_PKGDIR) -I$(STAGING_DIR)/usr/include -march=skylake -O3 -Wno-unused -DOGG_MUSIC -DWITH_GL" \
-		LIBS="$(FRONTIER_AX_BRIDGE_OBJ) -L$(STAGING_DIR)/usr/lib -lax_core -lpthread -lGL -lGLU -lvorbisfile -lvorbis -logg -lini -lSDL2_image $$($(STAGING_DIR)/usr/bin/sdl2-config --libs 2>/dev/null || echo '-lSDL2') -lm"
+		LIBS="$(FRONTIER_AX_BRIDGE_OBJ) -L$(STAGING_DIR)/usr/lib -lax_core -lstdc++ -lpthread -lGL -lGLU -lvorbisfile -lvorbis -logg -lini -lSDL2_image $$($(STAGING_DIR)/usr/bin/sdl2-config --libs 2>/dev/null || echo '-lSDL2') -lm"
 endef
 
 define FRONTIER_AX_INSTALL_TARGET_CMDS
