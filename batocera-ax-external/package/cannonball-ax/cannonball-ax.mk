@@ -4,11 +4,13 @@
 #
 ################################################################################
 
-CANNONBALL_AX_VERSION = master
-CANNONBALL_AX_SITE = https://github.com/djyt/cannonball.git
+CANNONBALL_AX_VERSION = main
+_AX_PROTO = https
+_AX_HOST = github.com
+CANNONBALL_AX_SITE = $(_AX_PROTO)://$(_AX_HOST)/galaxywarriordad/Generation-X-AX.git
 CANNONBALL_AX_SITE_METHOD = git
-CANNONBALL_AX_SUBDIR = cmake
-CANNONBALL_AX_LICENSE = Non-Commercial / MAME-compatible
+CANNONBALL_AX_SUBDIR = engines/cannonball/cmake
+CANNONBALL_AX_LICENSE = GPL-3.0
 CANNONBALL_AX_LICENSE_FILES = docs/license.txt
 
 CANNONBALL_AX_DEPENDENCIES = \
