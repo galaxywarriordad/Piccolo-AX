@@ -46,7 +46,17 @@ config BR2_PACKAGE_RMG_AX
 	help
 	  Deterministic Nintendo 64 emulator (Rosalie's Mupen GUI) linked against ax-sdk.
 
+config BR2_PACKAGE_CANNONBALL_AX
+	bool "Cannonball-OutRun [AX] (Sega Arcade)"
+	default y
+	select BR2_PACKAGE_AX_SDK
+	select BR2_PACKAGE_BOOST
+	select BR2_PACKAGE_SDL2
+	help
+	  Deterministic Sega OutRun C++ arcade engine linked against ax-sdk.
+
 config BR2_PACKAGE_LSFG_VK
+
 	bool "lsfg-vk 2.0.0+ (Implicit Vulkan Frame Generation)"
 	default y
 	help
