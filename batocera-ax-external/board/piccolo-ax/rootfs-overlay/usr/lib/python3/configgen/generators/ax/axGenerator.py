@@ -89,6 +89,8 @@ def build_emulator_cmd(system_name: str, rom_path: Path) -> list[str]:
         emu_args = ["/usr/bin/cannonball", "-cfgfile", "/userdata/system/configs/cannonball/config.xml"]
     elif system_name == "frontier":
         emu_args = ["/usr/bin/frontier-fe2", "-f"]
+    elif system_name == "megadrive":
+        emu_args = ["/usr/bin/blastem", "-f", str(rom_path)]
     else:
         emu_args = ["/usr/bin/eden-cli", "-f", "-g", str(rom_path)]
     if Path("/sys/fs/cgroup/eden.slice").exists():
