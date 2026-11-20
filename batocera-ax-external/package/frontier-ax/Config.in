@@ -1,0 +1,6 @@
+config BR2_PACKAGE_FRONTIER_AX
+	bool "frontier-ax"
+	depends on BR2_PACKAGE_AX_SDK
+	select BR2_PACKAGE_SDL2
+	help
+	  Frontier: Elite II (glfrontier) package for Piccolo-AX.
