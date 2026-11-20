@@ -85,6 +85,8 @@ def build_emulator_cmd(system_name: str, rom_path: Path) -> list[str]:
         emu_args = ["/usr/bin/Cemu", "-f", "-g", str(rom_path)]
     elif system_name == "n64":
         emu_args = ["/usr/bin/RMG", "--nogui", "--fullscreen", str(rom_path)]
+    elif system_name == "cannonball":
+        emu_args = ["/usr/bin/cannonball", "-cfgfile", "/userdata/system/configs/cannonball/config.xml"]
     else:
         emu_args = ["/usr/bin/eden-cli", "-f", "-g", str(rom_path)]
     if Path("/sys/fs/cgroup/eden.slice").exists():
