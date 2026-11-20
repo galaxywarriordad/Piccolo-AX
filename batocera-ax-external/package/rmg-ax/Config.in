@@ -1,0 +1,21 @@
+config BR2_PACKAGE_RMG_AX
+	bool "rmg-ax"
+	depends on BR2_PACKAGE_QT6
+	select BR2_PACKAGE_QT6BASE_GUI
+	select BR2_PACKAGE_QT6BASE_WIDGETS
+	select BR2_PACKAGE_QT6BASE_OPENGL
+	select BR2_PACKAGE_QT6BASE_VULKAN
+	select BR2_PACKAGE_QT6SVG
+	select BR2_PACKAGE_QT6WEBSOCKETS
+	select BR2_PACKAGE_SDL3
+	select BR2_PACKAGE_LIBSAMPLERATE
+	select BR2_PACKAGE_SPEEXDSP
+	select BR2_PACKAGE_LIBUSB
+	select BR2_PACKAGE_HIDAPI
+	select BR2_PACKAGE_MINIZIP
+	select BR2_PACKAGE_FREETYPE
+	select BR2_PACKAGE_VULKAN_HEADERS
+	help
+	  Rosalie's Mupen GUI (RMG) [AX] — Nintendo 64 emulator wired to
+	  ax-sdk for deterministic core isolation, HugeTLB fastmem,
+	  and lock-free real-time USB DAC audio on Piccolo [AX].
