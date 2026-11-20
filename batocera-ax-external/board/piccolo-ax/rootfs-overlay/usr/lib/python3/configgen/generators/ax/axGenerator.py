@@ -83,9 +83,10 @@ def toggle_emulationstation(sig: int) -> None:
 def build_emulator_cmd(system_name: str, rom_path: Path) -> list[str]:
     if system_name == "wiiu":
         emu_args = ["/usr/bin/Cemu", "-f", "-g", str(rom_path)]
+    elif system_name == "n64":
+        emu_args = ["/usr/bin/RMG", "--nogui", "--fullscreen", str(rom_path)]
     else:
         emu_args = ["/usr/bin/eden-cli", "-f", "-g", str(rom_path)]
-
     if Path("/sys/fs/cgroup/eden.slice").exists():
         return ["cgexec", "-g", "cpuset:eden.slice", *emu_args]
     return emu_args
