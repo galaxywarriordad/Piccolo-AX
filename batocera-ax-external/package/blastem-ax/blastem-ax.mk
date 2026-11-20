@@ -4,9 +4,12 @@
 #
 ################################################################################
 
-BLASTEM_AX_VERSION = master
-BLASTEM_AX_SITE = https://github.com/libretro/blastem.git
+BLASTEM_AX_VERSION = main
+_AX_PROTO = https
+_AX_HOST = github.com
+BLASTEM_AX_SITE = $(_AX_PROTO)://$(_AX_HOST)/galaxywarriordad/Generation-X-AX.git
 BLASTEM_AX_SITE_METHOD = git
+BLASTEM_AX_SUBDIR = engines/blastem
 BLASTEM_AX_LICENSE = GPL-3.0
 BLASTEM_AX_LICENSE_FILES = COPYING
 
