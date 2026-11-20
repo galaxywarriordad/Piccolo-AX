@@ -98,6 +98,8 @@ def launch_title(system_name: str, rom_path_str: str, title_id: str) -> int:
     vmtouch_proc = pin_rom_assets(rom_path)
 
     env = os.environ.copy()
+    env.setdefault("DISPLAY", ":0")
+    env["QT_QPA_PLATFORM"] = "xcb"
     env["__GL_YIELD"] = "NOTHING"
     env["__GL_SYNC_TO_VBLANK"] = "1"
     env["__GL_MaxFramesAllowed"] = "1"
