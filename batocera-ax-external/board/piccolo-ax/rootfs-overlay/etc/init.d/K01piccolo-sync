@@ -7,10 +7,16 @@ case "$1" in
     killall -TERM vmtouch 2>/dev/null || true
     mkdir -p /userdata/cache /userdata/pgo
 
-    if [ -d /dev/shm/eden_cache ] && [ "$(ls -A /dev/shm/eden_cache 2>/dev/null)" ]; then
-        tar -I "zstd -3" -cf /userdata/cache/eden_cache.tar.zst.tmp -C /dev/shm/eden_cache .
+    if [ -d /dev/shm/emu_cache ] && [ "$(ls -A /dev/shm/emu_cache 2>/dev/null)" ]; then
+        tar -I "zstd -3" -cf /userdata/cache/emu_cache.tar.zst.tmp -C /dev/shm/emu_cache .
         sync
-        mv -f /userdata/cache/eden_cache.tar.zst.tmp /userdata/cache/eden_cache.tar.zst
+        mv -f /userdata/cache/emu_cache.tar.zst.tmp /userdata/cache/emu_cache.tar.zst
+    fi
+
+    if [ -d /dev/shm/pgo ] && [ "$(ls -A /dev/shm/pgo 2>/dev/null)" ]; then
+        tar -I "zstd -3" -cf /userdata/pgo/pgo_traces.tar.zst.tmp -C /dev/shm/pgo .
+        sync
+        mv -f /userdata/pgo/pgo_traces.tar.zst.tmp /userdata/pgo/pgo_traces.tar.zst
     fi
 
     if [ -d /dev/shm/nv_cache ] && [ "$(ls -A /dev/shm/nv_cache 2>/dev/null)" ]; then
