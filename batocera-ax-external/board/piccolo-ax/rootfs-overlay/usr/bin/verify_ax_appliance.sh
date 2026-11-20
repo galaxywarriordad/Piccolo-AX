@@ -54,10 +54,15 @@ else
     echo "[WARN] 6. HiBy FC3 USB DAC not currently connected"
 fi
 
-# 7. RootFS < 300 MB Budget Check
+# 7. RootFS < 512 MB Budget Check
 if [ -f /boot/boot/rootfs.erofs ]; then
     SIZE_MB=$(( $(stat -c%s /boot/boot/rootfs.erofs) / 1024 / 1024 ))
-    echo "[PASS] 7. EROFS image size: ${SIZE_MB} MB / 300 MB ceiling"
+    if [ "${SIZE_MB}" -le 512 ]; then
+        echo "[PASS] 7. EROFS image size: ${SIZE_MB} MB / 512 MB ceiling"
+    else
+        echo "[FAIL] 7. EROFS image size (${SIZE_MB} MB) exceeds 512 MB ceiling"
+        FAIL=1
+    fi
 fi
 
 echo "============================================================"
