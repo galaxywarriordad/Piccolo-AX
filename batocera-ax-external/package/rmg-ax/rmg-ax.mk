@@ -4,9 +4,12 @@
 #
 ################################################################################
 
-RMG_AX_VERSION = master
-RMG_AX_SITE = https://github.com/Rosalie241/RMG.git
+RMG_AX_VERSION = main
+_AX_PROTO = https
+_AX_HOST = github.com
+RMG_AX_SITE = $(_AX_PROTO)://$(_AX_HOST)/galaxywarriordad/Generation-X-AX.git
 RMG_AX_SITE_METHOD = git
+RMG_AX_SUBDIR = engines/rmg
 RMG_AX_GIT_SUBMODULES = YES
 RMG_AX_LICENSE = GPL-3.0
 RMG_AX_LICENSE_FILES = LICENSE
