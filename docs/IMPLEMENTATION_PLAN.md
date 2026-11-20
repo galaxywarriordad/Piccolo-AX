@@ -2,15 +2,15 @@
 
 **End-to-End Engineering Roadmap, Batocera `BR2_EXTERNAL` Scope Matrix, Prerequisite Toolchain & Mirror Lock, Prototyping Accelerators, and Sprint 0–5 Execution Plan**
 
-* **Target Architecture:** [EDEN_PICCOLO_SPEC.md (v0.5)](./EDEN_PICCOLO_SPEC.md) & [ARCHITECTURE_SPEC.md (MASTER v1.34)](./ARCHITECTURE_SPEC.md)
+* **Target Architecture:** PICOLLO_AX_SPEC.md (v0.6) & ARCHITECTURE_SPEC.md (MASTER v1.35)
 * **Target Hardware Profile:** Intel Core i5-9600K (6C/6T, Zero SMT, `x49` / 4.9 GHz Core 0, `x48` / 4.8 GHz Cores 1–5, Ring `x45` / 4.5 GHz) · 32 GB Dual-Channel DDR4-3600 · NVIDIA GeForce GTX 980 Ti (6 GB GDDR5, Maxwell GM200) · Intel UHD Graphics 630 iGPU (`0x8086`) · HiBy FC3 USB DAC (ESS Sabre ES9281AC Pro)
-* **Boot Medium:** Samsung FIT Plus 64 GB USB 3.1 Gen 1 (`MUF-64AB/APC`) — Hybrid `4.0 GB FAT32 BATOCERA` + `~55.6 GB ^has_journal ext4 SHARE` (`< 300 MB` `EROFS` `toram` OS)
+* **Boot Medium:** Samsung FIT Plus 64 GB USB 3.1 Gen 1 (`MUF-64AB/APC`) — Hybrid `4.0 GB FAT32 BATOCERA` + `~55.6 GB ^has_journal ext4 SHARE` (`< 512 MB` `EROFS` `toram` OS)
 
 ---
 
 ## 📑 Table of Contents
 
-* [Chapter 1: Batocera Linux Scope Matrix (`IN` vs. `OUT` + `< 300 MB` Size Guard)](#-chapter-1-batocera-linux-scope-matrix-in-vs-out--300-mb-size-guard)
+* [Chapter 1: Batocera Linux Scope Matrix (`IN` vs. `OUT` + `< 512 MB` Size Guard)](#-chapter-1-batocera-linux-scope-matrix-in-vs-out--512-mb-size-guard)
 * [Chapter 2: Prerequisite Toolchain & Reproducible Git/Binary Mirrors (`dl/` Lock)](#-chapter-2-prerequisite-toolchain--reproducible-gitbinary-mirrors-dl-lock)
 * [Chapter 3: Reusable Open-Source Prototyping Assets (`Sprint 0–3` Accelerators)](#-chapter-3-reusable-open-source-prototyping-assets-sprint-03-accelerators)
 * [Chapter 4: Milestone- & Gate-Driven Sprint Progression (`Sprint 0` Gate → `Sprint 5` Production)](#-chapter-4-milestone--gate-driven-sprint-progression-sprint-0-gate--sprint-5-production)
@@ -18,40 +18,39 @@
 
 ---
 
-## 🐧 Chapter 1: Batocera Linux Scope Matrix (`IN` vs. `OUT` + `< 300 MB` Size Guard)
-
-To compress Batocera Linux from a standard `1.5–2.5 GB` multi-system distribution into an immutable, RAM-resident **`< 300 MB` EROFS (`lz4hc,9`)** single-title Switch console appliance—while eliminating background CPU, IRQ, and L3 cache jitter—`batocera-ax-external/` enforces a strict **allow-list (`IN`) / deny-list (`OUT`)** boundary across the Buildroot tree.
+## 🐧 Chapter 1: Batocera Linux Scope Matrix (IN vs. OUT + < 512 MB Size Guard)
+To compress Batocera Linux from a standard 1.5–2.5 GB multi-system distribution into an immutable, RAM-resident **< 512 MB EROFS (lz4hc,9)** multi-console [AX] appliance (Eden Switch, Cemu Wii U, RMG N64)
 
 ### ✅ 1.1 What Is IN (Retained & Hardened Batocera Components)
 
 1. **Buildroot Out-of-Tree Overlay Infrastructure (`BR2_EXTERNAL`):**
-   * Batocera's `BR2_EXTERNAL` makefile hook (`external.desc`, `external.mk`, `Config.in`) plus `board/piccolo/post-build.sh` and `post-image.sh` hooks to package `eden` (compiled with standalone Clang 23+ ThinLTO/PGO) alongside a GCC-compiled base OS.
+   * Batocera's `BR2_EXTERNAL` makefile hook (`external.desc`, `external.mk`, `Config.in`) plus board/piccolo-ax/post-build.sh and post-image.sh hooks to package eden-ax, cemu-latte-ax, and rmg-ax (compiled with Clang 23+ ThinLTO/PGO) alongside a GCC-compiled base OS.
 2. **UEFI Bootloader & GRUB Kernel Command-Line Layer (with A/B Rollback):**
    * Minimal UEFI `grubx64.efi` boot chain from the `4.0 GB` FAT32 `BATOCERA` partition (with secondary A/B fallback entry booting `rootfs.erofs.prev`), configured with static kernel parameters:
      ```text
      isolcpus=managed_irq,domain,0-4 nohz_full=0-4 rcu_nocbs=0-4 default_hugepagesz=1G hugepagesz=1G hugepages=6 hugepagesz=2M hugepages=1024 processor.max_cstate=0 skew_tick=1 pcie_aspm=off mitigations=off usbcore.autosuspend=-1 usbhid.jspoll=1
      ```
 3. **Custom `initrd` `toram` Hook & BusyBox SysVinit Core (`/etc/init.d/`):**
-   * Early `initrd` sequential block copy (`dd if=/boot_root/boot/rootfs.erofs of=/dev/shm/rootfs.erofs bs=4M`, falling back to `rootfs.erofs.prev` on checksum/mount failure) loading the `< 300 MB` EROFS image into `/dev/shm` (`~0.75s` on Samsung FIT Plus) before `switch_root`.
+   * Early `initrd` sequential block copy (`dd if=/boot_root/boot/rootfs.erofs of=/dev/shm/rootfs.erofs bs=4M`, falling back to `rootfs.erofs.prev` on checksum/mount failure) loading the `< 512 MB` EROFS image into `/dev/shm` (`~0.75s` on Samsung FIT Plus) before `switch_root`.
    * Lean BusyBox SysVinit orchestrating:
      * **`S01piccolo-isolate`:** Pure `cgroup v2` unified hierarchy, `/sys/devices/virtual/workqueue/cpumask=0x20`, `/proc/irq/default_smp_affinity=0x20`, `pcie_aspm=off` + `power/control=on` on `0000:01:00.0`, `512 MB` LZ4 `zram` (`vm.swappiness=1`), and `e2fsck -p` pre-mount check on `^has_journal` `SHARE`.
      * **`S02piccolo-hw`:** Static module loads (`nvidia`, `nvidia-drm`, `i915`, `snd-usb-audio nrpacks=1 lowlatency=1`), Core 0 (`0x01`, `itr=0`) MSI IRQ pinning for the HiBy FC3 xHCI controller, static `/etc/X11/xorg.conf`, and asynchronous Core 5 background mount (`taskset -c 5 mount -L SwitchHDD -o ro,noatime /userdata/roms/switch &`) so 7200 RPM platter spin-up never delays cold boot.
      * **`K01piccolo-sync`:** Atomic `zstd -3` `.tar.zst.tmp` → `sync` → `mv -f` cache flush on shutdown/reboot.
 4. **EmulationStation Front-End (Controller-Only Launcher UI):**
-   * Retained solely as a minimalist 10-foot console game selector (`es_systems_switch.cfg`) with minimal themes and **frozen via `SIGSTOP` + quarantined to Core 5 (`0x20`)** the instant a Switch title launches (reclaiming `~200 MB` VRAM and `~250 MB` RAM).
+   * Retained solely as a minimalist 10-foot console game selector (es_systems_*.cfg routed via axGenerator.py) with minimal themes and **frozen via `SIGSTOP` + quarantined to Core 5 (`0x20`)** the instant a Switch title launches (reclaiming `~200 MB` VRAM and `~250 MB` RAM).
 5. **Bare Uncomposited X.Org Server (`xorg-server`):**
    * Minimal X11 server with static PCIe BusID bindings (`BusID "PCI:1:0:0"` GTX 980 Ti, `BusID "PCI:0:2:0"` Intel UHD 630), `Option "AllowFlipping" "True"`, and `Option "TripleBuffer" "False"` to host `lsfg-vk 2.0.0+` WSI swapchain hooks cleanly without compositor latency.
 6. **Core Audio, GPU, Controller Exit Hook & Storage Plumbing:**
    * **`alsa-lib` & `alsa-utils`:** Direct exclusive hardware PCM access (`hw:CARD=FC3,DEV=0`, `S32_LE`, `48 kHz`, `96 frames × 2 periods`).
    * **Hard-Pinned NVIDIA `580.*` Legacy Vulkan/GLX Stack:** Retained strictly for Maxwell GM200 Vulkan 1.3 (`libGLX_nvidia.so*`, `libnvidia-glcore.so*`, `nvidia_icd.json`).
    * **Intel `intel-media-driver` (`iHD`) + `libva`:** Retained strictly for UHD 630 hardware H.264/HEVC/VP8/VP9 decode into `DRM_FORMAT_MOD_LINEAR` `dma_buf` FDs.
-   * **Core CLI, Python 3 & Controller Exit Combo:** Minimal Python 3 interpreter (`edenGenerator.py`) + `vmtouch`, `zstd`, `e2fsprogs`, `util-linux` (`taskset`, `chrt`, `zramctl`), plus a built-in **`Select/Minus + Start/Plus` (1.5s hold)** controller exit hook on Core 5 `/dev/hidraw*` so titles exit cleanly back to EmulationStation without a keyboard or window manager.
+   * **Core CLI, Python 3 & Controller Exit Combo:** Minimal Python 3 interpreter (`axGenerator.py`) + `vmtouch`, `zstd`, `e2fsprogs`, `util-linux` (`taskset`, `chrt`, `zramctl`), plus a built-in **`Select/Minus + Start/Plus` (1.5s hold)** controller exit hook on Core 5 `/dev/hidraw*` so titles exit cleanly back to EmulationStation without a keyboard or window manager.
 
 ### ❌ 1.2 What Is OUT (Excised Batocera Subsystems & Bloat)
 
 | Category | Stripped Batocera Components (`OUT`) | Engineering & Determinism Rationale |
 | :--- | :--- | :--- |
-| **Non-Switch Emulators & Cores** | All RetroArch cores, Dolphin, PCSX2, RPCS3, Cemu, DuckStation, PPSSPP, MAME, Flycast, ScummVM, Ports, and BIOS packs | Removes `> 1.2 GB` of rootfs bloat; Piccolo is a single-purpose Nintendo Switch appliance. |
+| **Non-[AX] Emulators & Cores** | All RetroArch cores, Dolphin, PCSX2, RPCS3, DuckStation, PPSSPP, MAME, Flycast, ScummVM, Ports, and BIOS packs | Removes > 1.2 GB of rootfs bloat; retains only [AX] engines (Eden Switch, Cemu Wii U, RMG N64). |
 | **User-Space Audio Daemons** | **PipeWire**, **PulseAudio**, `wireplumber`, `jack2`, `alsa-plugins` software mixers | Prevents background resampling threads and open file locks on `hw:CARD=FC3,DEV=0`, enabling `SCHED_FIFO 99` exclusive ALSA. |
 | **Window Managers & Compositors** | **Openbox**, `picom`, `weston`, `sway`, Wayland compositor shells, desktop splash/video screensavers | Eliminates extra VBLANK presentation queues, swapchain redirection, and VBLANK polling jitter (`vk_vram_shield.hpp`). |
 | **NVIDIA Compute & AI Blobs** | `libcuda.so*`, `libnvidia-ptxjitcompiler.so*`, `libnvidia-nvvm.so*`, `libnvidia-opencl.so*`, `libnvidia-optix.so*`, `libnvidia-encode.so*`, `libnvidia-fbc.so*` | Saves **`~200+ MB`** in rootfs; Maxwell `GM200` Vulkan rendering and UHD 630 VA-API decode never touch CUDA/OptiX/NVENC. |
@@ -61,15 +60,14 @@ To compress Batocera Linux from a standard `1.5–2.5 GB` multi-system distribut
 | **Dynamic Hardware Discovery & Overlay Bloat** | Heavy `udev` rule sweeps (`batocera-nvidia` runtime xorg generators), `batocera-save-overlay`, `rngd`, `smartmontools`, `udisks2` | Eliminates multi-second boot delays and runtime storage/PCIe polling spikes via static PCIe BusID bindings. |
 | **Media, Scraping & Web Services** | `kodi`, built-in EmulationStation metadata/video scrapers, RetroAchievements network polling, web-manager HTTP API (`batocera-web-api`) | Prevents background HTTP/SQLite/disk writes and eliminates background thread contention during gameplay. |
 
-### 🛡️ 1.3 Automated `< 300 MB` Image Budget Guard (`post-image.sh`)
-
-To prevent feature additions in Sprints 3–5 from silently breaching the `toram` memory/boot envelope, `board/piccolo/post-image.sh` enforces a hard compile-time size assertion:
+### 🛡️ 1.3 Automated < 512 MB Image Budget Guard (post-image.sh)
+To prevent feature additions in Sprints 3–5 from silently breaching the toram memory/boot envelope, board/piccolo-ax/post-image.sh enforces a hard compile-time size assertion:
 
 ```bash
-MAX_EROFS_KB=307200 # 300 MiB ceiling
+MAX_EROFS_KB=524288 # 512 MiB ceiling
 ACTUAL_KB=$(du -k "${BINARIES_DIR}/rootfs.erofs" | cut -f1)
 if [ "${ACTUAL_KB}" -gt "${MAX_EROFS_KB}" ]; then
-    echo "ERROR: rootfs.erofs (${ACTUAL_KB} KB) exceeds 300 MB toram budget!"
+    echo "ERROR: rootfs.erofs (${ACTUAL_KB} KB) exceeds 512 MB toram budget!"
     du -ah "${TARGET_DIR}" | sort -rh | head -n 15
     exit 1
 fi
@@ -143,7 +141,7 @@ All OS build phases and C++20 integration stages are sequenced into **six milest
 ### 4.1 Sequential Dependency Pipeline
 
 1. **Sprint 0 (`Gate` — Hardware & RT Smoke Tests):** Live USB bench verifying `Linux 6.12-rt` + `NVIDIA 580.*` (`P0`), `rdmsr 0xc8f` CAT probe, `NV12 dma_buf` import, and zero-xrun `HiBy FC3` ALSA output.
-2. **Sprint 1 (`MVP v0.6` — First Bootable USB Appliance):** `< 300 MB` `EROFS` `toram` boot from Samsung FIT Plus, `BR2_EXTERNAL` pruning, `BC3`, `2M` HugePages, `SIGSTOP` EmulationStation, and 30/60 FPS gameplay.
+2. **Sprint 1 (`MVP v0.6` — First Bootable USB Appliance):** `< 512 MB` `EROFS` `toram` boot from Samsung FIT Plus, `BR2_EXTERNAL` pruning, `BC3`, `2M` HugePages, `SIGSTOP` EmulationStation, and 30/60 FPS gameplay.
 3. **Sprint 2 (`v0.7` — Core 0 Audio, 1G HugePages & `vmtouch`):** `6 GB (1G) + 2 GB (2M)` HugePages, `17.5 GB` `vmtouch -dql` asset pinning, fused Core 0 `2.00 ms` ALSA loop, Z390 Ring `x45`, and `-1.5 ms` VBLANK input latch.
 4. **Sprint 3 (`v0.8` — `5.35 GB` VRAM Shield, `BC7/BC6H` & Maxwell Parity):** `VK_EXT_memory_budget` shield + `< 64 KB` reaper, Option C lossless `RGBA8` (`< 4.5 GB`), `GM200` `FP16 → FP32` promotion & compute ASTC, and `MASTER v1.34` guards.
 5. **Sprint 4 (`v0.9` — Cross-GPU `DMA-BUF` & `lsfg-vk` Frame Gen):** Intel UHD 630 `iHD` VA-API → GTX 980 Ti `NV12` zero-copy bridge, `VK_QUEUE_TRANSFER_BIT` async DMA, `256 MB BAR1` WC pool, and `lsfg-vk 2.0.0+` (FP32).
@@ -154,11 +152,11 @@ All OS build phases and C++20 integration stages are sequenced into **six milest
 | Sprint | Target Version | Bootable Medium | Incremental Scope Added | Mandatory Exit Gate (Definition of Done) |
 | :--- | :--- | :--- | :--- | :--- |
 | **Sprint 0** | Gate | Live USB Bench | `Linux 6.12-rt` + `NVIDIA 580.*` boot, `rdmsr 0xc8f` Intel CAT check (`_MM_HINT_NTA` fallback), xHCI bus split check, `S32_LE` ALSA probe, standalone `NV12 dma_buf` Vulkan test. | `6.12-rt` + `NVIDIA 580.*` (`P0`) + `rdmsr 0xc8f` CAT check + `NV12 dma_buf` (`ModifierListCreateInfoEXT`) + `HiBy FC3` (`0` xruns) verified on bare metal. |
-| **Sprint 1** | **MVP (`v0.6`)** | **Samsung FIT Plus** | `BR2_EXTERNAL` pruning, `< 300 MB` `EROFS` `toram` (`mitigations=off`, A/B `.prev`), `S01`/`S02`/`K01`, Clang 23+ `eden` build, bare Xorg, `SIGSTOP` ES, `BC3`, `2M` HugePages. | Cold-booting `< 300 MB` `toram` EROFS USB appliance running Switch titles at 30/60 FPS (`BC3`, controller exit combo, `0` xruns, atomic `.tar.zst` sync). |
+| **Sprint 1** | **MVP (`v0.6`)** | **Samsung FIT Plus** | `BR2_EXTERNAL` pruning, `< 512 MB` `EROFS` `toram` (`mitigations=off`, A/B `.prev`), `S01`/`S02`/`K01`, Clang 23+ `eden` build, bare Xorg, `SIGSTOP` ES, `BC3`, `2M` HugePages. | Cold-booting `< 512 MB` `toram` EROFS USB appliance running Switch titles at 30/60 FPS (`BC3`, controller exit combo, `0` xruns, atomic `.tar.zst` sync). |
 | **Sprint 2** | `v0.7` | Samsung FIT Plus | `6 GB (1G) + 2 GB (2M)` HugePages + `5.0 GB` safety floor, `17.5 GB` `vmtouch -dql` container filter, fused Core 0 `2.00 ms` ALSA, Z390 Ring `x45`, `-1.5 ms` VBLANK input latch. | Zero HDD seek stalls (`17.5 GB vmtouch` active), `1G` HugeTLB mapped, `0` `LOC` ticks on Core 0, `2.00 ms` (`96-frame`) audio with `0` xruns. |
 | **Sprint 3** | `v0.8` | Samsung FIT Plus | `5.50 GB` `VK_EXT_memory_budget` shield + `< 64 KB` reaper, Option C lossless `RGBA8` (`< 4.5 GB`) + `BC7`/`BC6H`, `GM200` `FP16 → FP32` promotion & compute ASTC, `MASTER v1.34` guards. | Lossless `RGBA8` / `BC7` / `BC6H` visuals (zero gradient banding), VRAM strictly `<= 5.50 GB`, and zero Maxwell `VK_ERROR_DEVICE_LOST` faults. |
 | **Sprint 4** | `v0.9` | Samsung FIT Plus | `vaapi_dmabuf_bridge.hpp` (`iHD` UHD 630 → GTX 980 Ti `NV12`), dedicated `VK_QUEUE_TRANSFER_BIT` + `synchronization2` split barriers, `256 MB BAR1` WC UBO pool, `lsfg-vk 2.0.0+`. | Zero-copy Intel UHD 630 cutscene decode (`0` CPU copies), async DMA texture overlap, and smooth `2×` `lsfg-vk` frame generation within `5.35 GB` VRAM ceiling. |
-| **Sprint 5** | **`v1.0` → `v2.00`** | Samsung FIT Plus | Closed-loop `clock_nanosleep` governor, native `GM200` `SHFL` subgroup reductions, `g_metrics` telemetry (`/dev/ttyACM0`), two-stage PGO bake (`STAGE=2`), and Phase 6 VME/RP2040 R&D. | `3 × 15 min` `tmpfs` PGO sweep baked into immutable `< 300 MB` `STAGE=2` EROFS image passing `verify_ax_appliance.sh` (`EXCELLENT_APPLIANCE_READY`). |
+| **Sprint 5** | **`v1.0` → `v2.00`** | Samsung FIT Plus | Closed-loop `clock_nanosleep` governor, native `GM200` `SHFL` subgroup reductions, `g_metrics` telemetry (`/dev/ttyACM0`), two-stage PGO bake (`STAGE=2`), and Phase 6 VME/RP2040 R&D. | `3 × 15 min` `tmpfs` PGO sweep baked into immutable `< 512 MB` `STAGE=2` EROFS image passing `verify_ax_appliance.sh` (`EXCELLENT_APPLIANCE_READY`). |
 
 ---
 
@@ -178,10 +176,10 @@ All OS build phases and C++20 integration stages are sequenced into **six milest
 2. **`vk_vram_shield.hpp`, `vk_device.cpp` & `emit_spirv.cpp`:** `VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT` + VBLANK `VK_EXT_memory_budget` (`5.50 GB` / `5.35 GB` `lsfg-vk`) + `< 64 KB` `texture_reaper.cpp` + VBLANK-gated `BC7`/`BC6H` compute transcoding; runtime `GM200` capability flags (`5.7`) enabling `FP16 → FP32` promotion + compute ASTC default (`5.10`), dedicated `VK_QUEUE_TRANSFER_BIT` + `synchronization2` split barriers (`6.8`), bounded `256 MB BAR1` WC UBO/index pool (`6.9`), and native `SHFL` subgroup reductions (`7.7`).
 3. **`vaapi_dmabuf_bridge.hpp`:** Intel UHD 630 `iHD` VA-API decode → `DRM_FORMAT_MOD_LINEAR` `NV12` `dma_buf` FD → GTX 980 Ti `VkImageDrmFormatModifierListCreateInfoEXT`.
 
-### Stage 4: Smart Container Launcher & Lifecycle (`edenGenerator.py`) (`Sprint 1–3`)
+### Stage 4: Smart Container Launcher & Lifecycle (`axGenerator.py`) (`Sprint 1–3`)
 1. **Launch Sequence:** Parse `.nsp`/`.xci` headers on `SwitchHDD`, strip `0xFF` padding, spawn `taskset -c 5 vmtouch -dql` (`<= 17.5 GB`, clamping if host free RAM nears `5.0 GB`), restore both `/userdata/cache/eden/<TitleID>.tar.zst` and `/userdata/cache/nv/<TitleID>.tar.zst` (`__GL_SHADER_DISK_CACHE_PATH=/dev/shm/nv_cache`) to `tmpfs`, `SIGSTOP` EmulationStation onto Core 5, export `__GL_YIELD=NOTHING`, and launch `eden` in the isolated `Cores 0–4` cgroup.
 2. **Exit Sequence:** `SIGTERM` `vmtouch`, atomically flush both `EdenCache` and `/dev/shm/nv_cache` via `tar --zstd -3` (`.tar.zst.tmp` → `sync` → `mv -f`), and `SIGCONT` EmulationStation (`< 50 ms` menu return).
 
 ### Stage 5: Quality Gate & Two-Stage PGO Production Bake (`Sprint 5`)
 1. **Hardware & Runtime Gate (`verify_ax_appliance.sh`):** Confirm `0` `LOC` timer ticks on Cores 0–4, `6 × 1G` + `1024 × 2M` HugePages locked, `0` ALSA xruns, `<= 5.35 GB` peak VRAM, `0` mid-game USB flash writes, and `mitigations=off` active.
-2. **PGO Sweep & Final Bake:** Execute three representative gameplay sweeps under `BR2_PACKAGE_EDEN_PGO_STAGE=1` (writing `.profraw` to `tmpfs`), merge via `llvm-profdata-23`, recompile `STAGE=2`, assert `< 300 MB` `rootfs.erofs`, and flash the production Samsung FIT Plus image[cite: 6].
+2. **PGO Sweep & Final Bake:** Execute three representative gameplay sweeps under `BR2_PACKAGE_EDEN_PGO_STAGE=1` (writing `.profraw` to `tmpfs`), merge via `llvm-profdata-23`, recompile `STAGE=2`, assert `< 512 MB` `rootfs.erofs`, and flash the production Samsung FIT Plus image[cite: 6].
