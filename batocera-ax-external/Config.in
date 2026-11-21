@@ -107,6 +107,17 @@ if BR2_PACKAGE_PICCOLO_AX_DESKTOP && BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH != ""
 source "$BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH/buildroot/Config.in"
 endif
 
+config BR2_PACKAGE_FLAC_AX
+	bool "FLAC_AX & [AX] Audio/Visual Studio (ESS Sabre + Akai MPK Mini MK3)"
+	default y
+	select BR2_PACKAGE_AX_SDK
+	select BR2_PACKAGE_FLAC
+	select BR2_PACKAGE_ALSA_LIB
+	select BR2_PACKAGE_SDL2
+	help
+	  Bit-perfect ESS Sabre FLAC player (flac_ax) and unified [AX]
+	  Audio/Visual Synth, Mixer & OpenGL Spectrum Studio (ax_av_studio).
+
 config BR2_PACKAGE_LSFG_VK
 	bool "lsfg-vk 2.0.0+ (Implicit Vulkan Frame Generation)"
 	default y
