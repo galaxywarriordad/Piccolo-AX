@@ -119,6 +119,8 @@ def launch_title(system_name: str, rom_path_str: str, title_id: str) -> int:
     env["MESA_VK_WSI_PRESENT_MODE"] = "fifo"
     env["XDG_CACHE_HOME"] = str(EMU_TMPFS)
 
+    subprocess.run(["pkill", "-USR1", "-x", "flac_ax"], check=False)
+    subprocess.run(["pkill", "-USR1", "-x", "ax_av_studio"], check=False)
     toggle_emulationstation(signal.SIGSTOP)
     try:
         cmd = build_emulator_cmd(system_name, rom_path)
