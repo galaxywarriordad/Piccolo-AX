@@ -73,8 +73,41 @@ config BR2_PACKAGE_BLASTEM_AX
 	help
 	  Cycle-accurate Sega Mega Drive / Genesis engine (YM2612 FM + 68k/Z80 JIT) linked against ax-sdk.
 
-config BR2_PACKAGE_LSFG_VK
+config BR2_PACKAGE_FLYCAST_AX
+	bool "Flycast [AX] (Sega Dreamcast / NAOMI / Atomiswave)"
+	default y
+	select BR2_PACKAGE_AX_SDK
+	select BR2_PACKAGE_SDL2
+	select BR2_PACKAGE_ALSA_LIB
+	select BR2_PACKAGE_LIBCURL
+	select BR2_PACKAGE_VULKAN_HEADERS
+	select BR2_PACKAGE_VULKAN_LOADER
+	select BR2_PACKAGE_LIBZIP
+	help
+	  Deterministic Sega Dreamcast, NAOMI & Atomiswave engine linked against ax-sdk.
 
+config BR2_PACKAGE_HATARI_AX
+	bool "Hatari [AX] (Atari ST / STE / TT / Falcon)"
+	default y
+	select BR2_PACKAGE_AX_SDK
+	select BR2_PACKAGE_SDL2
+	select BR2_PACKAGE_ALSA_LIB
+	select BR2_PACKAGE_LIBPNG
+	help
+	  Cycle-accurate Atari ST/STE/TT/Falcon emulator with ALSA MIDI and ax-sdk audio ring.
+
+config BR2_PACKAGE_PICCOLO_AX_DESKTOP
+	bool "Piccolo-AX Desktop Workbench Layer (Opt-in < 35 MB C/C++ Suite)"
+	default n
+	help
+	  Optional on-demand C/C++ desktop workbench (LXQt/XFCE, Falkon, GrafX2,
+	  LibreSprite, mtPaint, AzPainter, GHex, CPU-X, nvtop) with SHARE persistence.
+
+if BR2_PACKAGE_PICCOLO_AX_DESKTOP && BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH != ""
+source "$BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH/buildroot/Config.in"
+endif
+
+config BR2_PACKAGE_LSFG_VK
 	bool "lsfg-vk 2.0.0+ (Implicit Vulkan Frame Generation)"
 	default y
 	help
@@ -88,12 +121,3 @@ config BR2_PACKAGE_VMTOUCH
 	  Bulk pre-faults filtered game containers into DDR4 RAM (-dql).
 
 endmenu
-```[cite: 8]
-
-*Verification:* After pasting and committing `frontier-ax.mk`, run a Buildroot dry-run or package build (`make frontier-ax-source` / `make frontier-ax`) and confirm `as68k/as68k` runs on the host and `$(TARGET_DIR)/usr/bin/frontier-fe2` is created.
-
-<ElicitationsGroup message="If you hit a build error when testing frontier-ax in Buildroot:">
-  <Elicitation label="Missing library error" query="Buildroot failed linking frontier-ax due to a missing library flag. Which library is missing?"/>
-  <Elicitation label="as68k build issue" query="Building as68k failed in frontier-ax. How should I fix the as68k build step?"/>
-  <Elicitation label="Missing Buildroot package" query="Buildroot reported a missing package in FRONTIER_AX_DEPENDENCIES. Which dependency should I adjust?"/>
-</ElicitationsGroup>
