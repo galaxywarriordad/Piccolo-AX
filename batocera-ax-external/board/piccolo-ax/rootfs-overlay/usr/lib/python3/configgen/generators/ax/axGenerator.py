@@ -91,6 +91,10 @@ def build_emulator_cmd(system_name: str, rom_path: Path) -> list[str]:
         emu_args = ["/usr/bin/frontier-fe2", "-f"]
     elif system_name == "megadrive":
         emu_args = ["/usr/bin/blastem", "-f", str(rom_path)]
+    elif system_name in ("dreamcast", "naomi", "atomiswave"):
+        emu_args = ["/usr/bin/flycast", "-config", "window:fullscreen=yes", str(rom_path)]
+    elif system_name == "atarist":
+        emu_args = ["/usr/bin/hatari", "--fullscreen", str(rom_path)]
     else:
         emu_args = ["/usr/bin/eden-cli", "-f", "-g", str(rom_path)]
     if Path("/sys/fs/cgroup/eden.slice").exists():
