@@ -4,9 +4,16 @@
 #
 ################################################################################
 
+FLAC_AX_LOCAL_DIR := $(wildcard $(BR2_EXTERNAL_PICCOLO_AX_PATH)/../../FLAC_AX)
+ifneq ($(FLAC_AX_LOCAL_DIR),)
+FLAC_AX_SITE = $(FLAC_AX_LOCAL_DIR)
+FLAC_AX_SITE_METHOD = local
+else
 FLAC_AX_VERSION = main
 FLAC_AX_SITE = https://github.com
 FLAC_AX_SITE_METHOD = git
+endif
+
 FLAC_AX_LICENSE = MIT
 FLAC_AX_LICENSE_FILES = LICENSE.md
 FLAC_AX_SUPPORTS_IN_SOURCE_BUILD = NO
@@ -44,18 +51,14 @@ FLAC_AX_CONF_OPTS += \
 
 define FLAC_AX_INSTALL_TARGET_CMDS
 	$(INSTALL) -D -m 0755 $(@D)/flac_ax $(TARGET_DIR)/usr/bin/flac_ax
-	if [ -f $(@D)/ax_av_studio ]; then \
-		$(INSTALL) -D -m 0755 $(@D)/ax_av_studio $(TARGET_DIR)/usr/bin/ax_av_studio; \
-	fi
-	if [ -f $(@D)/ax_video_upscaler ]; then \
-		$(INSTALL) -D -m 0755 $(@D)/ax_video_upscaler $(TARGET_DIR)/usr/bin/ax_video_upscaler; \
-	fi
-	if [ -f $(@D)/ax_appliance_tui ]; then \
-		$(INSTALL) -D -m 0755 $(@D)/ax_appliance_tui $(TARGET_DIR)/usr/bin/ax_appliance_tui; \
-	fi
+	for bin in ax_av_studio ax_video_upscaler ax_appliance_tui; do \
+		if [ -x "$(@D)/$$bin" ]; then \
+			$(INSTALL) -D -m 0755 "$(@D)/$$bin" "$(TARGET_DIR)/usr/bin/$$bin"; \
+		fi; \
+	done
 	$(INSTALL) -D -m 0644 \
-		$(BR2_EXTERNAL_PICCOLO_AX_PATH)/package/flac-ax/99-hiby-fc3-ax.rules \
-		$(TARGET_DIR)/etc/udev/rules.d/99-hiby-fc3-ax.rules
+		$(BR2_EXTERNAL_PICCOLO_AX_PATH)/package/flac-ax/99-ax-usb-dacs.rules \
+		$(TARGET_DIR)/etc/udev/rules.d/99-ax-usb-dacs.rules
 endef
 
 $(eval $(cmake-package))
