@@ -1,0 +1,35 @@
+# /etc/udev/rules.d/99-ax-usb-dacs.rules
+# Dedicated bare-metal ALSA isolation & USB autosuspend lock for Piccolo [AX] & FLAC_AX
+# Targets: HiBy FC3, FiiO KA11, TRN Black Pearl, Moondrop Dawn Pro 2, Apple USB-C (UK A2155)
+
+# ---------------------------------------------------------------------------
+# 1. Sound Subsystem: Bypass PulseAudio / PipeWire ACP & set audio permissions
+# ---------------------------------------------------------------------------
+
+# HiBy FC3 (ESS ES9281AC Pro — VID 0x32BB & legacy 0x2FC6)
+SUBSYSTEM=="sound", ATTRS{idVendor}=="32bb", ATTR{id}="FC3", ENV{PULSE_IGNORE}="1", ENV{ACP_IGNORE}="1", GROUP="audio", MODE="0660"
+SUBSYSTEM=="sound", ATTRS{idVendor}=="2fc6", ATTR{id}="FC3", ENV{PULSE_IGNORE}="1", ENV{ACP_IGNORE}="1", GROUP="audio", MODE="0660"
+
+# FiiO KA11 (CS43131 + SGM8262 — FiiO VID 0x2972)
+SUBSYSTEM=="sound", ATTRS{idVendor}=="2972", ATTR{id}="KA11", ENV{PULSE_IGNORE}="1", ENV{ACP_IGNORE}="1", GROUP="audio", MODE="0660"
+
+# TRN Black Pearl (Dual CS43131 + CB5100 bridge — VID 0x3302 / 0x1A86)
+SUBSYSTEM=="sound", ATTRS{idVendor}=="3302", ATTR{id}="BLACKPEARL", ENV{PULSE_IGNORE}="1", ENV{ACP_IGNORE}="1", GROUP="audio", MODE="0660"
+SUBSYSTEM=="sound", ATTRS{idVendor}=="1a86", ATTR{id}="BLACKPEARL", ENV{PULSE_IGNORE}="1", ENV{ACP_IGNORE}="1", GROUP="audio", MODE="0660"
+
+# Moondrop Dawn Pro 2 (Dual CS43198 — Moondrop / Savitech UAC2 VID 0x2FC6 / 0x3302)
+SUBSYSTEM=="sound", ATTRS{idVendor}=="2fc6", ATTRS{product}=="*Dawn*", ATTR{id}="DAWNPRO2", ENV{PULSE_IGNORE}="1", ENV{ACP_IGNORE}="1", GROUP="audio", MODE="0660"
+
+# Apple USB-C to 3.5mm Adapter (UK A2155 / CS46L06 — VID 0x05AC)
+SUBSYSTEM=="sound", ATTRS{idVendor}=="05ac", ATTR{id}="APPLEDAC", ENV{PULSE_IGNORE}="1", ENV{ACP_IGNORE}="1", GROUP="audio", MODE="0660"
+
+# ---------------------------------------------------------------------------
+# 2. USB Subsystem: Lock power/control="on" (zero autosuspend) for Core 0 IRQ
+# ---------------------------------------------------------------------------
+
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="32bb", MODE="0660", GROUP="audio", TEST=="power/control", ATTR{power/control}="on", TEST=="power/autosuspend", ATTR{power/autosuspend}="-1"
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="2fc6", MODE="0660", GROUP="audio", TEST=="power/control", ATTR{power/control}="on", TEST=="power/autosuspend", ATTR{power/autosuspend}="-1"
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="2972", MODE="0660", GROUP="audio", TEST=="power/control", ATTR{power/control}="on", TEST=="power/autosuspend", ATTR{power/autosuspend}="-1"
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="3302", MODE="0660", GROUP="audio", TEST=="power/control", ATTR{power/control}="on", TEST=="power/autosuspend", ATTR{power/autosuspend}="-1"
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="1a86", MODE="0660", GROUP="audio", TEST=="power/control", ATTR{power/control}="on", TEST=="power/autosuspend", ATTR{power/autosuspend}="-1"
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="05ac", MODE="0660", GROUP="audio", TEST=="power/control", ATTR{power/control}="on", TEST=="power/autosuspend", ATTR{power/autosuspend}="-1"
