@@ -1,5 +1,3 @@
-### 2. Matching `Piccolo-AX/batocera-ax-external/package/amiberry-ax/amiberry-ax.mk`
-```makefile
 ################################################################################
 #
 # amiberry-ax
