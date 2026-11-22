@@ -3,8 +3,12 @@ set -euo pipefail
 
 TARGET_DIR="$1"
 DESKTOP_REPO="${BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH:-}"
-DESKTOP_ENABLED=0
+if [ -z "${DESKTOP_REPO}" ] && [ -n "${BR2_EXTERNAL_PICCOLO_AX_PATH:-}" ]; then
+    CANDIDATE="${BR2_EXTERNAL_PICCOLO_AX_PATH}/../../piccolo-ax-desktop"
+    [ -d "${CANDIDATE}" ] && DESKTOP_REPO="${CANDIDATE}"
+fi
 
+DESKTOP_ENABLED=0
 if [ -n "${DESKTOP_REPO}" ] && [ -d "${DESKTOP_REPO}" ]; then
     if [ -n "${BR2_CONFIG:-}" ] && [ -f "${BR2_CONFIG}" ]; then
         if grep -q '^BR2_PACKAGE_PICCOLO_AX_DESKTOP=y$' "${BR2_CONFIG}"; then
@@ -18,14 +22,14 @@ fi
 echo "[Piccolo-AX] Pruning unused GPU compute, LLVM, audio, and desktop bloat..."
 
 # 1. Strip unused NVIDIA compute/AI/encoding blobs (~200+ MB)
-rm -f "${TARGET_DIR}/usr/lib/libcuda.so" \
-      "${TARGET_DIR}/usr/lib/libnvidia-ptxjitcompiler.so" \
-      "${TARGET_DIR}/usr/lib/libnvidia-nvvm.so" \
-      "${TARGET_DIR}/usr/lib/libnvidia-opencl.so" \
-      "${TARGET_DIR}/usr/lib/libnvidia-optix.so" \
-      "${TARGET_DIR}/usr/lib/libnvidia-encode.so" \
-      "${TARGET_DIR}/usr/lib/libnvidia-fbc.so" \
-      "${TARGET_DIR}/usr/lib/libnvidia-ml.so"
+rm -f "${TARGET_DIR}/usr/lib/libcuda.so"* \
+      "${TARGET_DIR}/usr/lib/libnvidia-ptxjitcompiler.so"* \
+      "${TARGET_DIR}/usr/lib/libnvidia-nvvm.so"* \
+      "${TARGET_DIR}/usr/lib/libnvidia-opencl.so"* \
+      "${TARGET_DIR}/usr/lib/libnvidia-optix.so"* \
+      "${TARGET_DIR}/usr/lib/libnvidia-encode.so"* \
+      "${TARGET_DIR}/usr/lib/libnvidia-fbc.so"* \
+      "${TARGET_DIR}/usr/lib/libnvidia-ml.so"*
 
 # 2. Strip Mesa Gallium software rasterizers & target LLVM runtime (~100+ MB)
 rm -f "${TARGET_DIR}/usr/lib/libLLVM"*.so* \
@@ -37,7 +41,7 @@ rm -f "${TARGET_DIR}/usr/lib/libLLVM"*.so* \
       "${TARGET_DIR}/usr/lib/libvulkan_radeon.so" \
       "${TARGET_DIR}/usr/lib/libvulkan_nouveau.so"
 
-# 3. Purge user-space audio servers, window managers & background daemons
+# 3. Purge user-space audio servers & background daemons
 rm -rf "${TARGET_DIR}/usr/bin/pipewire" \
        "${TARGET_DIR}/usr/bin/wireplumber" \
        "${TARGET_DIR}/usr/bin/pulseaudio" \
@@ -50,18 +54,35 @@ rm -rf "${TARGET_DIR}/usr/bin/pipewire" \
 if [ "${DESKTOP_ENABLED}" -eq 0 ]; then
     rm -rf "${TARGET_DIR}/usr/bin/openbox"*
 else
-    echo "[Piccolo-AX] Installing piccolo-ax-desktop workbench launchers..."
-    install -d -m 0755 "${TARGET_DIR}/etc/profile.d" "${TARGET_DIR}/usr/local/bin"
-    install -m 0644 "${DESKTOP_REPO}/overlays/common/etc/profile.d/ax-desktop-xdg.sh" \
+    echo "[Piccolo-AX] Installing piccolo-ax-desktop workbench overlays & launchers..."
+    install -D -m 0644 "${DESKTOP_REPO}/overlays/common/etc/profile.d/ax-desktop-xdg.sh" \
         "${TARGET_DIR}/etc/profile.d/ax-desktop-xdg.sh"
-    install -m 0755 "${DESKTOP_REPO}/scripts/launch-desktop.sh" \
-        "${TARGET_DIR}/usr/local/bin/launch-desktop.sh"
-    install -m 0755 "${DESKTOP_REPO}/scripts/launch-falkon.sh" \
-        "${TARGET_DIR}/usr/local/bin/launch-falkon.sh"
-    install -m 0755 "${DESKTOP_REPO}/scripts/stage-share-apps.sh" \
-        "${TARGET_DIR}/usr/local/bin/stage-share-apps.sh"
-    install -m 0755 "${DESKTOP_REPO}/scripts/launch-mtpaint.sh" \
-        "${TARGET_DIR}/usr/local/bin/mtpaint"
+    install -D -m 0644 "${DESKTOP_REPO}/overlays/common/etc/mpv/mpv.conf" \
+        "${TARGET_DIR}/etc/mpv/mpv.conf"
+
+    if [ -f "${DESKTOP_REPO}/overlays/common/etc/xdg/lxqt/lxqt.conf" ]; then
+        install -D -m 0644 "${DESKTOP_REPO}/overlays/common/etc/xdg/lxqt/lxqt.conf" \
+            "${TARGET_DIR}/etc/xdg/lxqt/lxqt.conf"
+    fi
+    if [ -f "${DESKTOP_REPO}/overlays/common/etc/xdg/qterminal.org/qterminal.ini" ]; then
+        install -D -m 0644 "${DESKTOP_REPO}/overlays/common/etc/xdg/qterminal.org/qterminal.ini" \
+            "${TARGET_DIR}/etc/xdg/qterminal.org/qterminal.ini"
+    fi
+
+    if [ -d "${DESKTOP_REPO}/overlays/common/usr/share/grub/themes/piccolo-ax" ]; then
+        install -d -m 0755 "${TARGET_DIR}/usr/share/grub/themes/piccolo-ax/icons"
+        install -m 0644 "${DESKTOP_REPO}/overlays/common/usr/share/grub/themes/piccolo-ax/theme.txt" \
+            "${TARGET_DIR}/usr/share/grub/themes/piccolo-ax/theme.txt"
+        install -m 0644 "${DESKTOP_REPO}/overlays/common/usr/share/grub/themes/piccolo-ax/icons/"*.png \
+            "${TARGET_DIR}/usr/share/grub/themes/piccolo-ax/icons/" 2>/dev/null || true
+    fi
+
+    install -d -m 0755 "${TARGET_DIR}/usr/local/bin"
+    install -m 0755 "${DESKTOP_REPO}/scripts/launch-desktop.sh"   "${TARGET_DIR}/usr/local/bin/launch-desktop.sh"
+    install -m 0755 "${DESKTOP_REPO}/scripts/launch-falkon.sh"    "${TARGET_DIR}/usr/local/bin/launch-falkon.sh"
+    install -m 0755 "${DESKTOP_REPO}/scripts/launch-yt.sh"        "${TARGET_DIR}/usr/local/bin/launch-yt.sh"
+    install -m 0755 "${DESKTOP_REPO}/scripts/stage-share-apps.sh" "${TARGET_DIR}/usr/local/bin/stage-share-apps.sh"
+    install -m 0755 "${DESKTOP_REPO}/scripts/launch-mtpaint.sh"   "${TARGET_DIR}/usr/local/bin/mtpaint"
 fi
 
 # 4. Ensure init hooks & scripts are executable
