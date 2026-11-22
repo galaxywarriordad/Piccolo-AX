@@ -200,6 +200,4 @@ BR2_STRIP_strip=y
 # BR2_PACKAGE_QT6WEBENGINE is not set
 # BR2_PACKAGE_QT6MULTIMEDIA is not set
 # BR2_PACKAGE_QT6DECLARATIVE is not set
-```[cite: 26]
 
-*(Remember to also keep `source "$BR2_EXTERNAL_PICCOLO_AX_PATH/package/limine/Config.in"` wired in if `package/limine/Config.in` is sourced outside `batocera-ax-external/Config.in`.)*
