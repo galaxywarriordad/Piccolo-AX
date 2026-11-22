@@ -139,6 +139,8 @@ config BR2_PACKAGE_HATARI_AX
 	help
 	  Cycle-accurate Atari ST/STE/TT/Falcon emulator with ALSA MIDI and ax-sdk audio ring.
 
+source "$BR2_EXTERNAL_PICCOLO_AX_PATH/package/amiberry-ax/Config.in"
+
 endmenu
 
 menu "3. FLAC_AX Audio/Visual Studio & Upscaler"
