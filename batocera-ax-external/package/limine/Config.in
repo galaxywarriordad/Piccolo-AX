@@ -1,0 +1,5 @@
+config BR2_PACKAGE_LIMINE
+	bool "limine"
+	depends on BR2_x86_64
+	help
+	  Modern, deterministic UEFI/BIOS bootloader for Piccolo [AX].
