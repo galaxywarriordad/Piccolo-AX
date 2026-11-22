@@ -18,7 +18,8 @@ Whereas `Eden-Espresso-Wave-AX` serves as the Windows 10/11 desktop development 
 | **`piccolo-ax-desktop`** | Optional `< 35 MB` Native C/C++ Workbench & Diagnostics Layer | [GitHub (`piccolo-ax-desktop`)](https://github.com/galaxywarriordad/piccolo-ax-desktop) | `LXQt`/`XFCE`, `Falkon`, `GrafX2`, `LibreSprite`, `mtPaint`, `AzPainter`, `GHex`, `CPU-X` |
 | **Eden Espresso Wave `[AX]`** | Nintendo Switch Engine (Windows 10/11 Development Master) | [Eden Forgejo (`Eden-Espresso-Wave-AX`)](https://git.eden-emu.dev/galaxywarriordad/Eden-Espresso-Wave-AX) | Upstream: [Eden](https://eden-emu.dev) |
 | **Cemu Latte `[AX]`** | Nintendo Wii U (Win10/11 PGO + Batocera `[AX]`) | [GitHub (`Cemu-Latte-AX`)](https://github.com/galaxywarriordad/Cemu-Latte-AX) | Upstream: [Cemu](https://github.com/cemu-project/Cemu) |
-| **`FLAC_AX`** | Deterministic `[AX]` Audio/Visual Studio (`ax_av_studio`) & Bit-Perfect ESS Sabre Player (`flac_ax`) | [GitHub (`FLAC_AX`)](https://github.com/galaxywarriordad/FLAC_AX) | `libFLAC++` + Direct ALSA `SCHED_FIFO` + Akai MPK Mini MK3 + OpenGL HUD |
+| **`FLAC_AX`** | Deterministic `[AX]` Audio/Visual Studio (`ax_av_studio`), Tracker Player (`libopenmpt`), Video Upscaler & Espresso TUI | [GitHub (`FLAC_AX`)](https://github.com) | `libFLAC++` + `libopenmpt` + Direct ALSA `SCHED_FIFO` + Akai MPK Mini MK3 + OpenGL HUD |
+| **Amiberry `[AX]`** | Commodore Amiga 500 / 1200 / CD32 Engine | [GitHub (`Amiberry-AX`)](https://github.com/galaxywarriordad/Piccolo-AX/tree/main/batocera-ax-external/package/amiberry-ax) | Upstream: [Amiberry](https://github.com/BlitterStudio/amiberry.git) |
 
 ---
 
@@ -30,7 +31,7 @@ Whereas `Eden-Espresso-Wave-AX` serves as the Windows 10/11 desktop development 
 * **Real-Time Kernel & RAM Boot (`< 512 MB`):** Powered by `Linux 6.12-rt` (`isolcpus` / `nohz_full` / `rcu_nocbs`) and a pruned EROFS image loaded straight into RAM (`toram`) for fast startup and reduced storage contention.
 * **Unified Audio/Visual Studio (`FLAC_AX`):** Supports both the bit-perfect `44.1–384 kHz` `S32_LE` ESS Sabre player (`flac_ax`) and the `2.00 ms` `ax_av_studio` synth/mixer/spectrum HUD with `/run/lock/ax-dac.lock` DAC handoff on emulator launch.
 * **Opt-In Native C/C++ Desktop Workbench (`piccolo-ax-desktop`):** Supports an optional `< 35 MB` desktop profile via `BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH` with persistent `SHARE` storage and isolation from real-time appliance cores.
-* **Dual-GPU Silicon Offloading:** Pairs a discrete NVIDIA GPU (`580.*` drivers) with an Intel UHD iGPU (`iHD` VA-API / `VEBOX`) for hardware video decoding and zero-copy `dma_buf` frame presentation.[cite: 15]
+* **Dual-GPU Silicon Offloading:** Pairs a discrete NVIDIA GPU (`580.*` drivers) with an Intel UHD iGPU (`iHD` VA-API / `VEBOX`) for hardware video decoding and zero-copy `dma_buf` frame presentation.
 
 ---
 
@@ -66,7 +67,8 @@ Piccolo-AX/
 │       ├── frontier-ax/                # Frontier: Elite II [AX] package
 │       ├── flycast-ax/                 # Sega Dreamcast / NAOMI / Atomiswave [AX] package
 │       ├── hatari-ax/                  # Atari ST / STE / TT / Falcon [AX] package
-│       └── flac-ax/                    # Bit-perfect ESS Sabre player & A/V Studio package
+│       ├── amiberry-ax/                # Commodore Amiga 500 / 1200 / CD32 [AX] package
+│       └── flac-ax/                    # Bit-perfect ESS Sabre player, tracker player, A/V Studio, upscaler & Espresso TUI package
 ├── docs/                               # PICCOLO_AX_ARCHITECTURE.md, PICCOLO_AX_SPEC.md & IMPLEMENTATION_PLAN.md
 └── scripts/linux/                      # test_nv12_dmabuf.c, verify_ax_appliance.sh & fetch helpers
 ```[cite: 14, 15]
@@ -76,4 +78,4 @@ Piccolo-AX/
 ## 🤝 Contributing, License & Acknowledgements
 
 * **Contributing:** See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md) for Buildroot hygiene and hardware-ownership policies.
-* **License & Acknowledgements:** Licensed under **GPL-3.0** ([LICENSE](LICENSE)). Branched from [Eden Espresso Wave `[AX]`](https://git.eden-emu.dev/galaxywarriordad/Eden-Espresso-Wave-AX) and built on [Batocera Linux](https://github.com/batocera-linux/batocera.linux) and Buildroot. **Contains no proprietary console firmware, decryption keys, or games.**[cite: 15]
+* **License & Acknowledgements:** Licensed under **GPL-3.0** ([LICENSE](LICENSE)). Branched from [Eden Espresso Wave `[AX]`](https://git.eden-emu.dev/galaxywarriordad/Eden-Espresso-Wave-AX) and built on [Batocera Linux](https://github.com/batocera-linux/batocera.linux) and Buildroot. **Contains no proprietary console firmware, decryption keys, or games.**
