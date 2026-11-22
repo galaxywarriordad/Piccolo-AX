@@ -95,6 +95,8 @@ def build_emulator_cmd(system_name: str, rom_path: Path) -> list[str]:
         emu_args = ["/usr/bin/flycast", "-config", "window:fullscreen=yes", str(rom_path)]
     elif system_name == "atarist":
         emu_args = ["/usr/bin/hatari", "--fullscreen", str(rom_path)]
+    elif system_name in ("amiga", "amiga500", "amiga1200", "amigacd32"):
+        emu_args = ["/usr/bin/amiberry", "--autoload", str(rom_path), "-G"]
     else:
         emu_args = ["/usr/bin/eden-cli", "-f", "-g", str(rom_path)]
     if Path("/sys/fs/cgroup/eden.slice").exists():
@@ -121,6 +123,7 @@ def launch_title(system_name: str, rom_path_str: str, title_id: str) -> int:
 
     subprocess.run(["pkill", "-USR1", "-x", "flac_ax"], check=False)
     subprocess.run(["pkill", "-USR1", "-x", "ax_av_studio"], check=False)
+    subprocess.run(["pkill", "-USR1", "-x", "ax_video_upscaler"], check=False)
     toggle_emulationstation(signal.SIGSTOP)
     try:
         cmd = build_emulator_cmd(system_name, rom_path)
