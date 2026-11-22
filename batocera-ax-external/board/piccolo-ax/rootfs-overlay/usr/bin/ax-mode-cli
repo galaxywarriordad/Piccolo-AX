@@ -1,0 +1,106 @@
+#!/bin/sh
+# /usr/bin/ax-mode-cli — Deterministic Mode-Scoped Launcher for Piccolo [AX]
+
+DAC_DEV="hw:CARD=FC3,DEV=0"
+DAC_LOCK="/run/lock/ax-dac.lock"
+AX_MODE="retro"
+
+for token in $(cat /proc/cmdline); do
+    case "$token" in
+        ax.mode=*) AX_MODE="${token#ax.mode=}" ;;
+        ax.dac_lock=*) DAC_LOCK="${token#ax.dac_lock=}" ;;
+    esac
+done
+
+mkdir -p /run/lock
+chmod 1777 /run/lock 2>/dev/null || true
+touch "$DAC_LOCK" 2>/dev/null || true
+
+run_rt_dac() {
+    if ! flock -n "$DAC_LOCK" taskset 0x01 chrt -f 80 "$@"; then
+        echo "[Piccolo-AX] Failed to acquire ${DAC_LOCK} or foreground process exited with error."
+        sleep 2
+    fi
+}
+
+# Desktop mode launches piccolo-ax-desktop directly with /userdata persistence
+if [ "$AX_MODE" = "desktop" ]; then
+    if [ -x /usr/local/bin/launch-desktop.sh ]; then
+        exec /usr/local/bin/launch-desktop.sh
+    elif [ -x /usr/bin/piccolo-ax-desktop ]; then
+        exec /usr/bin/piccolo-ax-desktop
+    else
+        echo "[Piccolo-AX] Desktop overlay not installed in this image. Rebooting..."
+        sleep 3
+        exec reboot
+    fi
+fi
+
+while true; do
+    clear
+    echo "============================================================"
+    echo "  Piccolo [AX] Bare-Metal Appliance — Mode: ${AX_MODE}"
+    echo "============================================================"
+
+    case "$AX_MODE" in
+        audio)
+            echo "  1) flac_ax        — Bit-Perfect FLAC / DSD RAM Transport"
+            echo "  2) ax_av_studio   — 2.00 ms Live Synth & FFT Studio"
+            echo "  v) Verify Appliance Hardware Gate"
+            echo "  r) Reboot to Limine Boot Menu"
+            printf "\nSelect option: "
+            read -r choice
+            case "$choice" in
+                1) run_rt_dac /usr/bin/flac_ax --device "$DAC_DEV" --volume 0.80 /userdata/music/ ;;
+                2) run_rt_dac /usr/bin/ax_av_studio --fullscreen --device "$DAC_DEV" --volume 0.80 ;;
+                v|V) /usr/bin/verify_ax_appliance.sh; printf "\nPress Enter..."; read -r _ ;;
+                r|R) exec reboot ;;
+            esac
+            ;;
+
+        upscaler)
+            echo "  1) Retro HDMI Capture (MS2130S -> 1080p Bob)"
+            echo "  2) Retro HDMI Capture (MS2130S -> 2K Bob)"
+            echo "  3) DVD ISO Upscaler   (Audio-Master PTS -> 2K)"
+            echo "  v) Verify Appliance Hardware Gate"
+            echo "  r) Reboot to Limine Boot Menu"
+            printf "\nSelect option: "
+            read -r choice
+            case "$choice" in
+                1) run_rt_dac /usr/bin/ax_video_upscaler --mode retro --preset 1080p --v4l2 /dev/video0 --scan bob --device "$DAC_DEV" --volume 0.80 ;;
+                2) run_rt_dac /usr/bin/ax_video_upscaler --mode retro --preset 2k --v4l2 /dev/video0 --scan bob --device "$DAC_DEV" --volume 0.80 ;;
+                3) run_rt_dac /usr/bin/ax_video_upscaler --mode dvd --preset 2k --input /userdata/dvd/ --scan dvd --device "$DAC_DEV" --volume 0.80 ;;
+                v|V) /usr/bin/verify_ax_appliance.sh; printf "\nPress Enter..."; read -r _ ;;
+                r|R) exec reboot ;;
+            esac
+            ;;
+
+        retro)
+            echo "  1) EmulationStation   (Unified Retro Front-End)"
+            echo "  2) Eden-Espresso-Wave (Nintendo Switch)"
+            echo "  3) Cemu-Latte-AX      (Nintendo Wii U)"
+            echo "  4) Generation-X-AX    (Classic Consoles & Arcade)"
+            echo "  v) Verify Appliance Hardware Gate"
+            echo "  r) Reboot to Limine Boot Menu"
+            printf "\nSelect option: "
+            read -r choice
+            case "$choice" in
+                1) /usr/bin/emulationstation ;;
+                2) /usr/bin/eden ;;
+                3) /usr/bin/Cemu ;;
+                4) /usr/bin/generation-x-launcher ;;
+                v|V) /usr/bin/verify_ax_appliance.sh; printf "\nPress Enter..."; read -r _ ;;
+                r|R) exec reboot ;;
+            esac
+            ;;
+
+        *)
+            echo "  [WARN] Unknown ax.mode='${AX_MODE}'. Press 'r' to reboot to Limine."
+            printf "\nSelect option: "
+            read -r choice
+            case "$choice" in
+                r|R) exec reboot ;;
+            esac
+            ;;
+    esac
+done
