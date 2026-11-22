@@ -1,7 +1,6 @@
 #!/bin/sh
 # /usr/bin/ax-mode-cli — Deterministic Mode-Scoped Launcher for Piccolo [AX]
 
-DAC_DEV="hw:CARD=FC3,DEV=0"
 DAC_LOCK="/run/lock/ax-dac.lock"
 AX_MODE="retro"
 
@@ -16,6 +15,24 @@ mkdir -p /run/lock
 chmod 1777 /run/lock 2>/dev/null || true
 touch "$DAC_LOCK" 2>/dev/null || true
 
+# Resolve active USB DAC card ID & safe line-level volume (2.0 Vrms = 0.80, KA11 2.5 Vrms = 0.72, Apple 0.5 Vrms = 1.00)
+resolve_dac() {
+    DAC_CARD="FC3"
+    DAC_VOL="0.80"
+    for card in FC3 BLACKPEARL DAWNPRO2 KA11 APPLEDAC; do
+        if grep -q "\[$card" /proc/asound/cards 2>/dev/null; then
+            DAC_CARD="$card"
+            case "$card" in
+                KA11)     DAC_VOL="0.72" ;;
+                APPLEDAC) DAC_VOL="1.00" ;;
+                *)        DAC_VOL="0.80" ;;
+            esac
+            break
+        fi
+    done
+    DAC_DEV="hw:CARD=${DAC_CARD},DEV=0"
+}
+
 run_rt_dac() {
     if ! flock -n "$DAC_LOCK" taskset 0x01 chrt -f 80 "$@"; then
         echo "[Piccolo-AX] Failed to acquire ${DAC_LOCK} or foreground process exited with error."
@@ -26,31 +43,28 @@ run_rt_dac() {
 ensure_media_dir() {
     dir_path="$1"
     if [ ! -d "$dir_path" ]; then
-        echo "[Piccolo-AX][WARN] Directory '$dir_path' not found; creating it on /userdata..."
         mkdir -p "$dir_path" 2>/dev/null || true
     fi
 }
 
 status_line() {
+    resolve_dac
     share_info="SHARE: unmounted"
     if df -h /userdata >/dev/null 2>&1 && grep -qs "[[:space:]]/userdata[[:space:]]" /proc/mounts; then
         share_info="$(df -h /userdata 2>/dev/null | awk 'NR==2 {printf "SHARE: %s avail (%s used)", $4, $5}')"
     fi
 
     dac_info="DAC: absent"
-    if command -v aplay >/dev/null 2>&1 && aplay -l 2>/dev/null | grep -q "FC3"; then
-        dac_info="DAC: FC3 ready"
+    if grep -q "\[$DAC_CARD" /proc/asound/cards 2>/dev/null; then
+        dac_info="DAC: ${DAC_CARD} ready (vol=${DAC_VOL})"
     fi
 
     echo "  Status: ${share_info} | ${dac_info}"
 }
 
-# Desktop mode launches piccolo-ax-desktop directly with /userdata persistence
 if [ "$AX_MODE" = "desktop" ]; then
     if [ -x /usr/local/bin/launch-desktop.sh ]; then
         exec /usr/local/bin/launch-desktop.sh
-    elif [ -x /usr/bin/piccolo-ax-desktop ]; then
-        exec /usr/bin/piccolo-ax-desktop
     else
         echo "[Piccolo-AX] Desktop overlay not installed in this image. Rebooting..."
         sleep 3
@@ -59,6 +73,7 @@ if [ "$AX_MODE" = "desktop" ]; then
 fi
 
 while true; do
+    resolve_dac
     clear
     echo "============================================================"
     echo "  Piccolo [AX] Bare-Metal Appliance — Mode: ${AX_MODE}"
@@ -67,8 +82,9 @@ while true; do
 
     case "$AX_MODE" in
         audio)
-            echo "  1) flac_ax        — Bit-Perfect FLAC / DSD RAM Transport"
-            echo "  2) ax_av_studio   — 2.00 ms Live Synth & FFT Studio"
+            echo "  1) flac_ax          — Bit-Perfect FLAC / DSD RAM Transport"
+            echo "  2) ax_av_studio     — 2.00 ms Live Synth & FFT Studio"
+            echo "  t) ax_appliance_tui — Coffee/Espresso Visual Launcher"
             echo "  v) Verify Appliance Hardware Gate"
             echo "  r) Reboot to Limine Boot Menu"
             printf "\nSelect option: "
@@ -76,10 +92,13 @@ while true; do
             case "$choice" in
                 1)
                     ensure_media_dir "/userdata/music"
-                    run_rt_dac /usr/bin/flac_ax --device "$DAC_DEV" --volume 0.80 /userdata/music/
+                    run_rt_dac /usr/bin/flac_ax --device "$DAC_DEV" --mixer-card "$DAC_CARD" --volume "$DAC_VOL" /userdata/music/
                     ;;
                 2)
-                    run_rt_dac /usr/bin/ax_av_studio --fullscreen --device "$DAC_DEV" --volume 0.80
+                    run_rt_dac /usr/bin/ax_av_studio --fullscreen --device "$DAC_DEV" --mixer-card "$DAC_CARD" --volume "$DAC_VOL"
+                    ;;
+                t|T)
+                    [ -x /usr/bin/ax_appliance_tui ] && /usr/bin/ax_appliance_tui
                     ;;
                 v|V)
                     /usr/bin/verify_ax_appliance.sh
@@ -96,20 +115,24 @@ while true; do
             echo "  1) Retro HDMI Capture (MS2130S -> 1080p Bob)"
             echo "  2) Retro HDMI Capture (MS2130S -> 2K Bob)"
             echo "  3) DVD ISO Upscaler   (Audio-Master PTS -> 2K)"
+            echo "  t) ax_appliance_tui   (Coffee/Espresso Visual Launcher)"
             echo "  v) Verify Appliance Hardware Gate"
             echo "  r) Reboot to Limine Boot Menu"
             printf "\nSelect option: "
             read -r choice
             case "$choice" in
                 1)
-                    run_rt_dac /usr/bin/ax_video_upscaler --mode retro --preset 1080p --v4l2 /dev/video0 --scan bob --device "$DAC_DEV" --volume 0.80
+                    run_rt_dac /usr/bin/ax_video_upscaler --mode retro --preset 1080p --v4l2 /dev/video0 --scan bob --device "$DAC_DEV" --mixer-card "$DAC_CARD" --volume "$DAC_VOL"
                     ;;
                 2)
-                    run_rt_dac /usr/bin/ax_video_upscaler --mode retro --preset 2k --v4l2 /dev/video0 --scan bob --device "$DAC_DEV" --volume 0.80
+                    run_rt_dac /usr/bin/ax_video_upscaler --mode retro --preset 2k --v4l2 /dev/video0 --scan bob --device "$DAC_DEV" --mixer-card "$DAC_CARD" --volume "$DAC_VOL"
                     ;;
                 3)
                     ensure_media_dir "/userdata/dvd"
-                    run_rt_dac /usr/bin/ax_video_upscaler --mode dvd --preset 2k --input /userdata/dvd/ --scan dvd --device "$DAC_DEV" --volume 0.80
+                    run_rt_dac /usr/bin/ax_video_upscaler --mode dvd --preset 2k --input /userdata/dvd/ --scan dvd --device "$DAC_DEV" --mixer-card "$DAC_CARD" --volume "$DAC_VOL"
+                    ;;
+                t|T)
+                    [ -x /usr/bin/ax_appliance_tui ] && /usr/bin/ax_appliance_tui
                     ;;
                 v|V)
                     /usr/bin/verify_ax_appliance.sh
@@ -127,6 +150,7 @@ while true; do
             echo "  2) Eden-Espresso-Wave (Nintendo Switch)"
             echo "  3) Cemu-Latte-AX      (Nintendo Wii U)"
             echo "  4) Generation-X-AX    (Classic Consoles & Arcade)"
+            echo "  t) ax_appliance_tui   (Coffee/Espresso Visual Launcher)"
             echo "  v) Verify Appliance Hardware Gate"
             echo "  r) Reboot to Limine Boot Menu"
             printf "\nSelect option: "
@@ -136,6 +160,9 @@ while true; do
                 2) /usr/bin/eden ;;
                 3) /usr/bin/Cemu ;;
                 4) /usr/bin/generation-x-launcher ;;
+                t|T)
+                    [ -x /usr/bin/ax_appliance_tui ] && /usr/bin/ax_appliance_tui
+                    ;;
                 v|V)
                     /usr/bin/verify_ax_appliance.sh
                     printf "\nPress Enter..."
