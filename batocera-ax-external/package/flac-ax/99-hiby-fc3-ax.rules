@@ -1,0 +1,6 @@
+# /etc/udev/rules.d/99-hiby-fc3-ax.rules
+# 1. Prevent PulseAudio / PipeWire ACP from claiming HiBy FC3 (VID 0x32BB)
+SUBSYSTEM=="sound", ATTRS{idVendor}=="32bb", ATTR{id}="FC3", ENV{PULSE_IGNORE}="1", ENV{ACP_IGNORE}="1", GROUP="audio", MODE="0660"
+
+# 2. Disable USB autosuspend and grant audio group raw USB access for deterministic Core 0 IRQ timing
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="32bb", MODE="0660", GROUP="audio", TEST=="power/control", ATTR{power/control}="on", TEST=="power/autosuspend", ATTR{power/autosuspend}="-1"
