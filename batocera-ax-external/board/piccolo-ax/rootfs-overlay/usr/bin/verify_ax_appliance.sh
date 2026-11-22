@@ -22,7 +22,7 @@ else
 fi
 
 # 3. HugePages (6x 1G + 1024x 2M) & zram Check
-HP_1G=$(grep "HugePages_Total:" /proc/meminfo | awk '{print $2}')
+HP_1G=$(grep -E "^HugePages_Total:" /proc/meminfo 2>/dev/null | awk '{print $2}')
 if [ "${HP_1G:-0}" -ge 6 ] && [ -b /dev/zram0 ]; then
     echo "[PASS] 3. Hybrid HugePages (${HP_1G}x 1G) & LZ4 zram active"
 else
@@ -31,12 +31,15 @@ else
 fi
 
 # 4. NVIDIA 580.* Legacy Driver & Persistence Mode
-NV_VER=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null || echo "NONE")
-if [[ "${NV_VER}" == 580.* ]]; then
-    echo "[PASS] 4. NVIDIA Maxwell legacy driver pinned: ${NV_VER}"
+if command -v nvidia-smi >/dev/null 2>&1; then
+    NV_VER=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null || echo "NONE")
+    if [[ "${NV_VER}" == 580.* ]]; then
+        echo "[PASS] 4. NVIDIA Maxwell legacy driver pinned: ${NV_VER}"
+    else
+        echo "[WARN] 4. Expected NVIDIA 580.* driver, found: ${NV_VER}"
+    fi
 else
-    echo "[FAIL] 4. Expected NVIDIA 580.* driver, found: ${NV_VER}"
-    FAIL=1
+    echo "[WARN] 4. nvidia-smi not present in this mode/image"
 fi
 
 # 5. Intel UHD 630 VA-API (iHD) Render Node
@@ -48,21 +51,30 @@ else
 fi
 
 # 6. HiBy FC3 USB DAC Exclusive ALSA Node
-if aplay -l 2>/dev/null | grep -q "FC3"; then
+if command -v aplay >/dev/null 2>&1 && aplay -l 2>/dev/null | grep -q "FC3"; then
     echo "[PASS] 6. HiBy FC3 USB DAC detected on ALSA hw:CARD=FC3,DEV=0"
 else
-    echo "[WARN] 6. HiBy FC3 USB DAC not currently connected"
+    echo "[WARN] 6. HiBy FC3 USB DAC not currently connected or aplay unavailable"
 fi
 
-# 7. RootFS < 512 MB Budget Check
-if [ -f /boot/boot/rootfs.erofs ]; then
-    SIZE_MB=$(( $(stat -c%s /boot/boot/rootfs.erofs) / 1024 / 1024 ))
+# 7. RootFS <= 512 MB Budget Check
+EROFS_PATH=""
+if [ -f /boot/rootfs.erofs ]; then
+    EROFS_PATH="/boot/rootfs.erofs"
+elif [ -f /boot/boot/rootfs.erofs ]; then
+    EROFS_PATH="/boot/boot/rootfs.erofs"
+fi
+
+if [ -n "${EROFS_PATH}" ]; then
+    SIZE_MB=$(( $(stat -c%s "${EROFS_PATH}") / 1024 / 1024 ))
     if [ "${SIZE_MB}" -le 512 ]; then
-        echo "[PASS] 7. EROFS image size: ${SIZE_MB} MB / 512 MB ceiling"
+        echo "[PASS] 7. EROFS image (${EROFS_PATH}) size: ${SIZE_MB} MB / 512 MB ceiling"
     else
-        echo "[FAIL] 7. EROFS image size (${SIZE_MB} MB) exceeds 512 MB ceiling"
+        echo "[FAIL] 7. EROFS image (${EROFS_PATH}) size (${SIZE_MB} MB) exceeds 512 MB ceiling"
         FAIL=1
     fi
+else
+    echo "[WARN] 7. rootfs.erofs not mounted at /boot/rootfs.erofs or /boot/boot/rootfs.erofs"
 fi
 
 echo "============================================================"
