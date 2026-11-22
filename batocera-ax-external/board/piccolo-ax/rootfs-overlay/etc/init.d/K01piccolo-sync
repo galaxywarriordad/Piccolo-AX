@@ -1,48 +1,95 @@
 #!/bin/sh
-# S02piccolo-hw — 1:1 MSI IRQ binding, USB DAC low-latency, DAC lock & async SwitchHDD mount
+# K01piccolo-sync — Atomic RAM tmpfs (/dev/shm) -> SHARE persistence on stop/shutdown
 
-case "$1" in
-  start)
-    echo "[Piccolo-AX] Binding hardware IRQs & low-latency USB DAC parameters..."
-    mkdir -p /etc/modprobe.d
-    cat << 'EOF' > /etc/modprobe.d/piccolo-audio.conf
-options snd-usb-audio lowlatency=1
-EOF
-    if lsmod | grep -q "^snd_usb_audio"; then
-        modprobe -r snd_usb_audio 2>/dev/null && modprobe snd_usb_audio 2>/dev/null || true
+set -u
+
+SHARE_MOUNT="/userdata"
+STAGE_DIR="${SHARE_MOUNT}/system/ax-sync"
+LOG_TAG="[Piccolo-AX sync]"
+
+log_info() {
+    echo "${LOG_TAG} $*"
+}
+
+log_warn() {
+    echo "${LOG_TAG}[WARN] $*" >&2
+}
+
+is_share_mounted() {
+    grep -qs "[[:space:]]${SHARE_MOUNT}[[:space:]]" /proc/mounts
+}
+
+# Pack a source directory into an atomic .tar.zst archive on SHARE
+pack_dir_atomic() {
+    src_dir="$1"
+    dest_tar="$2"
+
+    if [ ! -d "$src_dir" ]; then
+        return 0
     fi
 
-    # Initialize exclusive DAC lockfile directory & node
-    mkdir -p /run/lock
-    chmod 1777 /run/lock
-    touch /run/lock/ax-dac.lock
-    chmod 0666 /run/lock/ax-dac.lock
-
-    # Bind GTX 980 Ti MSI IRQ to Core 1 (0x02)
-    for irq in $(grep -i "nvidia" /proc/interrupts | awk -F: '{print $1}' | tr -d ' '); do
-        echo 02 > "/proc/irq/${irq}/smp_affinity" 2>/dev/null || true
-    done
-
-    # Bind HiBy FC3 xHCI controller MSI IRQ to Core 0 (0x01)
-    FC3_BUS=$(lsusb | grep -iE "2fc6|32bb|HiBy" | awk '{print $2}' | sed 's/^0*//')
-    if [ -n "$FC3_BUS" ]; then
-        XHCI_PCI=$(basename "$(readlink -f "/sys/bus/usb/devices/usb${FC3_BUS}/../")" 2>/dev/null || true)
-        for irq in $(grep "${XHCI_PCI}" /proc/interrupts | awk -F: '{print $1}' | tr -d ' '); do
-            echo 01 > "/proc/irq/${irq}/smp_affinity" 2>/dev/null || true
-        done
+    # Skip empty directories so we avoid unnecessary flash writes
+    if [ -z "$(ls -A "$src_dir" 2>/dev/null || true)" ]; then
+        return 0
     fi
 
-    # Enable NVIDIA persistence mode (580.* legacy branch)
-    nvidia-smi -pm 1 >/dev/null 2>&1 || true
+    mkdir -p "$(dirname "$dest_tar")"
+    tmp_tar="${dest_tar}.tmp.$$"
 
-    # Stage RAM tmpfs shader & PGO directories
-    mkdir -p /dev/shm/emu_cache /dev/shm/nv_cache /dev/shm/pgo
+    if command -v zstd >/dev/null 2>&1; then
+        tar -C "$src_dir" -cf - . 2>/dev/null | zstd -3 -T0 -q -o "$tmp_tar" 2>/dev/null || {
+            rm -f "$tmp_tar"
+            log_warn "Failed compressing '$src_dir' -> '$dest_tar'"
+            return 0
+        }
+    else
+        tar -C "$src_dir" -cf "$tmp_tar" . 2>/dev/null || {
+            rm -f "$tmp_tar"
+            log_warn "Failed archiving '$src_dir' -> '$dest_tar'"
+            return 0
+        }
+    fi
 
-    # Mount SwitchHDD asynchronously on Core 5 so spin-up never blocks boot
-    mkdir -p /userdata/roms/switch /userdata/roms/wiiu /userdata/roms/n64
-    taskset -c 5 sh -c 'mount -L SwitchHDD -o ro,noatime /userdata/roms/switch 2>/dev/null || true' &
-    ;;
-  stop)
-    ;;
+    if [ -s "$tmp_tar" ]; then
+        mv -f "$tmp_tar" "$dest_tar"
+        log_info "Flushed '$src_dir' -> '$dest_tar' ($(du -h "$dest_tar" 2>/dev/null | awk '{print $1}'))"
+    else
+        rm -f "$tmp_tar"
+    fi
+}
+
+case "${1:-}" in
+    stop)
+        if ! is_share_mounted; then
+            log_warn "'${SHARE_MOUNT}' is not mounted; skipping RAM cache flush."
+            exit 0
+        fi
+
+        log_info "Flushing RAM caches to ${SHARE_MOUNT}..."
+        pack_dir_atomic "/dev/shm/emu_cache" "${STAGE_DIR}/emu_cache.tar.zst"
+        pack_dir_atomic "/dev/shm/pgo"       "${STAGE_DIR}/pgo.tar.zst"
+        pack_dir_atomic "/dev/shm/nv_cache"  "${STAGE_DIR}/nv_cache.tar.zst"
+
+        sync
+        ;;
+    start)
+        # Optional restore hook if archives exist and target /dev/shm dirs are empty
+        if is_share_mounted && command -v zstd >/dev/null 2>&1; then
+            for item in "emu_cache:/dev/shm/emu_cache" "pgo:/dev/shm/pgo" "nv_cache:/dev/shm/nv_cache"; do
+                name="${item%%:*}"
+                dst="${item#*:}"
+                arc="${STAGE_DIR}/${name}.tar.zst"
+                mkdir -p "$dst"
+                if [ -f "$arc" ] && [ -z "$(ls -A "$dst" 2>/dev/null || true)" ]; then
+                    zstd -dc -q "$arc" 2>/dev/null | tar -C "$dst" -xf - 2>/dev/null || true
+                fi
+            done
+        fi
+        ;;
+    *)
+        echo "Usage: $0 {start|stop}"
+        exit 1
+        ;;
 esac
+
 exit 0
