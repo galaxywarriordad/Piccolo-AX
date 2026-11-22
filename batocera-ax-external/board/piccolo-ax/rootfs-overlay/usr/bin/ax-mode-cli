@@ -5,7 +5,7 @@ DAC_DEV="hw:CARD=FC3,DEV=0"
 DAC_LOCK="/run/lock/ax-dac.lock"
 AX_MODE="retro"
 
-for token in $(cat /proc/cmdline); do
+for token in $(cat /proc/cmdline 2>/dev/null || true); do
     case "$token" in
         ax.mode=*) AX_MODE="${token#ax.mode=}" ;;
         ax.dac_lock=*) DAC_LOCK="${token#ax.dac_lock=}" ;;
@@ -21,6 +21,28 @@ run_rt_dac() {
         echo "[Piccolo-AX] Failed to acquire ${DAC_LOCK} or foreground process exited with error."
         sleep 2
     fi
+}
+
+ensure_media_dir() {
+    dir_path="$1"
+    if [ ! -d "$dir_path" ]; then
+        echo "[Piccolo-AX][WARN] Directory '$dir_path' not found; creating it on /userdata..."
+        mkdir -p "$dir_path" 2>/dev/null || true
+    fi
+}
+
+status_line() {
+    share_info="SHARE: unmounted"
+    if df -h /userdata >/dev/null 2>&1 && grep -qs "[[:space:]]/userdata[[:space:]]" /proc/mounts; then
+        share_info="$(df -h /userdata 2>/dev/null | awk 'NR==2 {printf "SHARE: %s avail (%s used)", $4, $5}')"
+    fi
+
+    dac_info="DAC: absent"
+    if command -v aplay >/dev/null 2>&1 && aplay -l 2>/dev/null | grep -q "FC3"; then
+        dac_info="DAC: FC3 ready"
+    fi
+
+    echo "  Status: ${share_info} | ${dac_info}"
 }
 
 # Desktop mode launches piccolo-ax-desktop directly with /userdata persistence
@@ -40,6 +62,7 @@ while true; do
     clear
     echo "============================================================"
     echo "  Piccolo [AX] Bare-Metal Appliance — Mode: ${AX_MODE}"
+    status_line
     echo "============================================================"
 
     case "$AX_MODE" in
@@ -51,10 +74,21 @@ while true; do
             printf "\nSelect option: "
             read -r choice
             case "$choice" in
-                1) run_rt_dac /usr/bin/flac_ax --device "$DAC_DEV" --volume 0.80 /userdata/music/ ;;
-                2) run_rt_dac /usr/bin/ax_av_studio --fullscreen --device "$DAC_DEV" --volume 0.80 ;;
-                v|V) /usr/bin/verify_ax_appliance.sh; printf "\nPress Enter..."; read -r _ ;;
-                r|R) exec reboot ;;
+                1)
+                    ensure_media_dir "/userdata/music"
+                    run_rt_dac /usr/bin/flac_ax --device "$DAC_DEV" --volume 0.80 /userdata/music/
+                    ;;
+                2)
+                    run_rt_dac /usr/bin/ax_av_studio --fullscreen --device "$DAC_DEV" --volume 0.80
+                    ;;
+                v|V)
+                    /usr/bin/verify_ax_appliance.sh
+                    printf "\nPress Enter..."
+                    read -r _
+                    ;;
+                r|R)
+                    exec reboot
+                    ;;
             esac
             ;;
 
@@ -67,11 +101,24 @@ while true; do
             printf "\nSelect option: "
             read -r choice
             case "$choice" in
-                1) run_rt_dac /usr/bin/ax_video_upscaler --mode retro --preset 1080p --v4l2 /dev/video0 --scan bob --device "$DAC_DEV" --volume 0.80 ;;
-                2) run_rt_dac /usr/bin/ax_video_upscaler --mode retro --preset 2k --v4l2 /dev/video0 --scan bob --device "$DAC_DEV" --volume 0.80 ;;
-                3) run_rt_dac /usr/bin/ax_video_upscaler --mode dvd --preset 2k --input /userdata/dvd/ --scan dvd --device "$DAC_DEV" --volume 0.80 ;;
-                v|V) /usr/bin/verify_ax_appliance.sh; printf "\nPress Enter..."; read -r _ ;;
-                r|R) exec reboot ;;
+                1)
+                    run_rt_dac /usr/bin/ax_video_upscaler --mode retro --preset 1080p --v4l2 /dev/video0 --scan bob --device "$DAC_DEV" --volume 0.80
+                    ;;
+                2)
+                    run_rt_dac /usr/bin/ax_video_upscaler --mode retro --preset 2k --v4l2 /dev/video0 --scan bob --device "$DAC_DEV" --volume 0.80
+                    ;;
+                3)
+                    ensure_media_dir "/userdata/dvd"
+                    run_rt_dac /usr/bin/ax_video_upscaler --mode dvd --preset 2k --input /userdata/dvd/ --scan dvd --device "$DAC_DEV" --volume 0.80
+                    ;;
+                v|V)
+                    /usr/bin/verify_ax_appliance.sh
+                    printf "\nPress Enter..."
+                    read -r _
+                    ;;
+                r|R)
+                    exec reboot
+                    ;;
             esac
             ;;
 
@@ -89,8 +136,14 @@ while true; do
                 2) /usr/bin/eden ;;
                 3) /usr/bin/Cemu ;;
                 4) /usr/bin/generation-x-launcher ;;
-                v|V) /usr/bin/verify_ax_appliance.sh; printf "\nPress Enter..."; read -r _ ;;
-                r|R) exec reboot ;;
+                v|V)
+                    /usr/bin/verify_ax_appliance.sh
+                    printf "\nPress Enter..."
+                    read -r _
+                    ;;
+                r|R)
+                    exec reboot
+                    ;;
             esac
             ;;
 
