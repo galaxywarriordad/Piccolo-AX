@@ -6,31 +6,35 @@ BOARD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_DIR="${TARGET_DIR:-${BINARIES_DIR}/../target}"
 
 EROFS_OUT="${BINARIES_DIR}/rootfs.erofs"
-BOOT_STAGE="${BINARIES_DIR}/boot-fat32"
+EROFS_PREV="${BINARIES_DIR}/rootfs.erofs.prev"
 BOOT_IMG="${BINARIES_DIR}/boot.vfat"
 SHARE_IMG="${BINARIES_DIR}/share.ext4"
-DISK_IMG="${BINARIES_DIR}/piccolo-ax-x86_64.img"
 
-# 512 MiB ceiling for RAM-resident EROFS rootfs
+# Optional target hint: 64g | 128g | universal (default)
+FIT_PROFILE="${FIT_PROFILE:-universal}"
 MAX_EROFS_KB=524288
-# 4.0 GiB FAT32 BATOCERA partition + 1.0 GiB base SHARE partition image
 BOOT_PART_MIB=4096
-SHARE_PART_MIB=1024
+# Compact build-time SHARE image; expand to fill 64 GB (~55.6G) or 128 GB on target
+SHARE_PART_MIB="${SHARE_PART_MIB:-2048}"
 
-require_cmd() {
-    if ! command -v "$1" >/dev/null 2>&1; then
-        echo "ERROR: Required host tool '$1' not found in PATH."
+case "${FIT_PROFILE}" in
+    64g|64GB|64)
+        DISK_IMG="${BINARIES_DIR}/piccolo-ax-fit64-x86_64.img"
+        ;;
+    128g|128GB|128)
+        DISK_IMG="${BINARIES_DIR}/piccolo-ax-fit128-x86_64.img"
+        ;;
+    universal|*)
+        DISK_IMG="${BINARIES_DIR}/piccolo-ax-fit-x86_64.img"
+        ;;
+esac
+
+for cmd in mkfs.erofs mkfs.vfat mkfs.ext4 mcopy mmd parted truncate; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        echo "ERROR: Required host tool '$cmd' not found in PATH."
         exit 1
     fi
-}
-
-require_cmd mkfs.erofs
-require_cmd mkfs.vfat
-require_cmd mkfs.ext4
-require_cmd mcopy
-require_cmd mmd
-require_cmd parted
-require_cmd truncate
+done
 
 if [ ! -d "${TARGET_DIR}" ]; then
     echo "ERROR: Target rootfs directory '${TARGET_DIR}' does not exist."
@@ -42,59 +46,42 @@ if [ ! -f "${BOARD_DIR}/limine.conf" ]; then
     exit 1
 fi
 
+# Rotate prior EROFS image for A/B fallback
+if [ -f "${EROFS_OUT}" ]; then
+    cp -f "${EROFS_OUT}" "${EROFS_PREV}"
+fi
+
 echo "[Piccolo-AX] Packing EROFS (lz4hc,9) rootfs image..."
 rm -f "${EROFS_OUT}"
 mkfs.erofs -zlz4hc,9 -T0 --force-uid=0 --force-gid=0 "${EROFS_OUT}" "${TARGET_DIR}"
 
 ACTUAL_KB=$(du -k "${EROFS_OUT}" | cut -f1)
 echo "[Piccolo-AX] rootfs.erofs size: ${ACTUAL_KB} KB / ${MAX_EROFS_KB} KB budget"
-
 if [ "${ACTUAL_KB}" -gt "${MAX_EROFS_KB}" ]; then
     echo "ERROR: rootfs.erofs (${ACTUAL_KB} KB) exceeds 512 MB toram budget!"
     du -ah "${TARGET_DIR}" | sort -rh | head -n 15
     exit 1
 fi
 
-echo "[Piccolo-AX] Staging FAT32 boot payload (Limine + kernel + EROFS)..."
-rm -rf "${BOOT_STAGE}"
-mkdir -p "${BOOT_STAGE}/EFI/BOOT" "${BOOT_STAGE}/boot"
-
-if [ -f "${BINARIES_DIR}/EFI/BOOT/BOOTX64.EFI" ]; then
-    cp -f "${BINARIES_DIR}/EFI/BOOT/BOOTX64.EFI" "${BOOT_STAGE}/EFI/BOOT/BOOTX64.EFI"
-else
-    echo "WARN: ${BINARIES_DIR}/EFI/BOOT/BOOTX64.EFI not found (verify BR2_PACKAGE_LIMINE=y)."
-fi
-
-if [ -f "${BINARIES_DIR}/limine-bios.sys" ]; then
-    cp -f "${BINARIES_DIR}/limine-bios.sys" "${BOOT_STAGE}/limine-bios.sys"
-fi
-
-if [ -f "${BINARIES_DIR}/bzImage" ]; then
-    cp -f "${BINARIES_DIR}/bzImage" "${BOOT_STAGE}/boot/bzImage"
-else
-    echo "WARN: ${BINARIES_DIR}/bzImage not found in ${BINARIES_DIR}."
-fi
-
-if [ -f "${BINARIES_DIR}/initrd.lz4" ]; then
-    cp -f "${BINARIES_DIR}/initrd.lz4" "${BOOT_STAGE}/boot/initrd.lz4"
-fi
-
-cp -f "${BOARD_DIR}/limine.conf" "${BOOT_STAGE}/limine.conf"
-cp -f "${EROFS_OUT}" "${BOOT_STAGE}/boot/rootfs.erofs"
-
-echo "[Piccolo-AX] Building ${BOOT_PART_MIB} MiB FAT32 (BATOCERA) partition image..."
+echo "[Piccolo-AX] Building ${BOOT_PART_MIB} MiB FAT32 (BATOCERA) image..."
 rm -f "${BOOT_IMG}"
 truncate -s "${BOOT_PART_MIB}M" "${BOOT_IMG}"
 mkfs.vfat -F 32 -n "BATOCERA" "${BOOT_IMG}" >/dev/null
 mmd -i "${BOOT_IMG}" ::/EFI ::/EFI/BOOT ::/boot
-mcopy -i "${BOOT_IMG}" -s "${BOOT_STAGE}/"* ::/
 
-echo "[Piccolo-AX] Building ${SHARE_PART_MIB} MiB ext4 (^has_journal, SHARE) partition image..."
+[ -f "${BINARIES_DIR}/EFI/BOOT/BOOTX64.EFI" ] && mcopy -i "${BOOT_IMG}" "${BINARIES_DIR}/EFI/BOOT/BOOTX64.EFI" ::/EFI/BOOT/BOOTX64.EFI
+[ -f "${BINARIES_DIR}/limine-bios.sys" ] && mcopy -i "${BOOT_IMG}" "${BINARIES_DIR}/limine-bios.sys" ::/limine-bios.sys
+mcopy -i "${BOOT_IMG}" "${BOARD_DIR}/limine.conf" ::/limine.conf
+mcopy -i "${BOOT_IMG}" "${EROFS_OUT}" ::/boot/rootfs.erofs
+[ -f "${EROFS_PREV}" ] && mcopy -i "${BOOT_IMG}" "${EROFS_PREV}" ::/boot/rootfs.erofs.prev
+[ -f "${BINARIES_DIR}/bzImage" ] && mcopy -i "${BOOT_IMG}" "${BINARIES_DIR}/bzImage" ::/boot/bzImage
+[ -f "${BINARIES_DIR}/initrd.lz4" ] && mcopy -i "${BOOT_IMG}" "${BINARIES_DIR}/initrd.lz4" ::/boot/initrd.lz4
+
+echo "[Piccolo-AX] Building ${SHARE_PART_MIB} MiB ext4 (^has_journal, SHARE) image..."
 rm -f "${SHARE_IMG}"
 truncate -s "${SHARE_PART_MIB}M" "${SHARE_IMG}"
 mkfs.ext4 -F -L "SHARE" -O ^has_journal "${SHARE_IMG}" >/dev/null
 
-echo "[Piccolo-AX] Assembling GPT disk image '${DISK_IMG}'..."
 TOTAL_MIB=$((1 + BOOT_PART_MIB + SHARE_PART_MIB))
 rm -f "${DISK_IMG}"
 truncate -s "${TOTAL_MIB}M" "${DISK_IMG}"
@@ -104,9 +91,6 @@ parted -s "${DISK_IMG}" mkpart "BATOCERA" fat32 1MiB "$((1 + BOOT_PART_MIB))MiB"
 parted -s "${DISK_IMG}" set 1 esp on
 parted -s "${DISK_IMG}" mkpart "SHARE" ext4 "$((1 + BOOT_PART_MIB))MiB" 100%
 
-BOOT_START_BYTES=$((1 * 1024 * 1024))
-SHARE_START_BYTES=$(((1 + BOOT_PART_MIB) * 1024 * 1024))
-
 dd if="${BOOT_IMG}" of="${DISK_IMG}" bs=1M seek=1 conv=notrunc status=none
 dd if="${SHARE_IMG}" of="${DISK_IMG}" bs=1M seek="$((1 + BOOT_PART_MIB))" conv=notrunc status=none
 
@@ -114,6 +98,4 @@ if command -v limine >/dev/null 2>&1 && [ -f "${BINARIES_DIR}/limine-bios.sys" ]
     limine bios-install "${DISK_IMG}" >/dev/null 2>&1 || true
 fi
 
-echo "[Piccolo-AX] Image build complete: ${DISK_IMG}"
-echo "  Partition 1 (BATOCERA, FAT32): offset ${BOOT_START_BYTES} bytes (${BOOT_PART_MIB} MiB)"
-echo "  Partition 2 (SHARE, ext4 ^has_journal): offset ${SHARE_START_BYTES} bytes (${SHARE_PART_MIB} MiB)"
+echo "[Piccolo-AX] Built ${DISK_IMG} (profile=${FIT_PROFILE}, SHARE=${SHARE_PART_MIB} MiB)."
