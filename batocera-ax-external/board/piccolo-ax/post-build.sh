@@ -71,4 +71,3 @@ chmod +x "${TARGET_DIR}/etc/init.d/S01piccolo-isolate" \
          "${TARGET_DIR}/usr/bin/ax-grow-share.sh" \
          "${TARGET_DIR}/usr/bin/ax-mode-cli" \
          "${TARGET_DIR}/usr/bin/verify_ax_appliance.sh" 2>/dev/null || true
-         
