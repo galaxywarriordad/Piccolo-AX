@@ -2,8 +2,10 @@
 set -euo pipefail
 
 BINARIES_DIR="$1"
+BOARD_DIR="$(dirname "$0")"
 TARGET_DIR="${TARGET_DIR:-${BINARIES_DIR}/../target}"
 EROFS_OUT="${BINARIES_DIR}/rootfs.erofs"
+BOOT_STAGE="${BINARIES_DIR}/boot-fat32"
 MAX_EROFS_KB=524288
 
 echo "[Piccolo-AX] Packing EROFS (lz4hc,9) image..."
@@ -18,3 +20,20 @@ if [ "${ACTUAL_KB}" -gt "${MAX_EROFS_KB}" ]; then
     du -ah "${TARGET_DIR}" | sort -rh | head -n 15
     exit 1
 fi
+
+echo "[Piccolo-AX] Staging FAT32 boot partition payload (Limine + kernel + EROFS)..."
+rm -rf "${BOOT_STAGE}"
+mkdir -p "${BOOT_STAGE}/EFI/BOOT" "${BOOT_STAGE}/boot"
+
+if [ -f "${BINARIES_DIR}/EFI/BOOT/BOOTX64.EFI" ]; then
+    cp -f "${BINARIES_DIR}/EFI/BOOT/BOOTX64.EFI" "${BOOT_STAGE}/EFI/BOOT/BOOTX64.EFI"
+fi
+if [ -f "${BINARIES_DIR}/limine-bios.sys" ]; then
+    cp -f "${BINARIES_DIR}/limine-bios.sys" "${BOOT_STAGE}/limine-bios.sys"
+fi
+
+cp -f "${BOARD_DIR}/limine.conf" "${BOOT_STAGE}/limine.conf"
+cp -f "${EROFS_OUT}" "${BOOT_STAGE}/boot/rootfs.erofs"
+
+[ -f "${BINARIES_DIR}/bzImage" ] && cp -f "${BINARIES_DIR}/bzImage" "${BOOT_STAGE}/boot/bzImage"
+[ -f "${BINARIES_DIR}/initrd.lz4" ] && cp -f "${BINARIES_DIR}/initrd.lz4" "${BOOT_STAGE}/boot/initrd.lz4"
