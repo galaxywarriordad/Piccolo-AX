@@ -1,3 +1,11 @@
+# --- Target Architecture & Size Discipline (< 512 MB EROFS toram) ---
+BR2_x86_64=y
+BR2_x86_skylake=y
+BR2_SHARED_LIBS=y
+BR2_STRIP_strip=y
+# BR2_ENABLE_DEBUG is not set
+# BR2_PACKAGE_MAN_DB is not set
+
 # --- Shared Pruned Qt6 Runtime for AX Emulators (Eden, RMG, Cemu) ---
 BR2_PACKAGE_QT6=y
 BR2_PACKAGE_QT6BASE=y
@@ -13,8 +21,13 @@ BR2_PACKAGE_QT6BASE_CONCURRENT=y
 BR2_PACKAGE_QT6SVG=y
 BR2_PACKAGE_QT6WEBSOCKETS=y
 
-# --- AX Core, Emulators & Appliance Tools ---
+# --- Bootloader & Core AX Runtime ---
+BR2_PACKAGE_LIMINE=y
 BR2_PACKAGE_AX_SDK=y
+BR2_PACKAGE_LSFG_VK=y
+BR2_PACKAGE_VMTOUCH=y
+
+# --- AX Console & Classic Engines ---
 BR2_PACKAGE_EDEN_AX=y
 BR2_PACKAGE_CEMU_LATTE_AX=y
 BR2_PACKAGE_RMG_AX=y
@@ -23,12 +36,20 @@ BR2_PACKAGE_FRONTIER_AX=y
 BR2_PACKAGE_BLASTEM_AX=y
 BR2_PACKAGE_FLYCAST_AX=y
 BR2_PACKAGE_HATARI_AX=y
-BR2_PACKAGE_FLAC_AX=y
-BR2_PACKAGE_LSFG_VK=y
-BR2_PACKAGE_VMTOUCH=y
-BR2_STRIP_strip=y
 
-# --- Strip Bloat to Stay Under 512 MB ---
+# --- FLAC_AX Bit-Perfect Audio, AV Studio, Upscaler & Espresso TUI ---
+BR2_PACKAGE_FLAC_AX=y
+BR2_PACKAGE_FLAC_AX_AV_STUDIO=y
+BR2_PACKAGE_FLAC_AX_VIDEO_UPSCALER=y
+BR2_PACKAGE_FLAC_AX_APPLIANCE_TUI=y
+BR2_PACKAGE_FLAC_AX_USB_DAC_RULES=y
+
+# --- Optional Desktop Workbench (Off by default to protect < 512 MB budget) ---
+# BR2_PACKAGE_PICCOLO_AX_DESKTOP is not set
+
+# --- Strip Bloat & Prevent Background Audio Server Contention ---
+# BR2_PACKAGE_PIPEWIRE is not set
+# BR2_PACKAGE_PULSEAUDIO is not set
 # BR2_PACKAGE_QT6BASE_EXAMPLES is not set
 # BR2_PACKAGE_QT6BASE_TESTS is not set
 # BR2_PACKAGE_QT6WEBENGINE is not set
