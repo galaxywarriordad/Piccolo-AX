@@ -1,29 +1,34 @@
 #!/bin/sh
-# S02piccolo-hw — 1:1 MSI IRQ binding, USB DAC low-latency & async SwitchHDD mount
+# S02piccolo-hw — 1:1 MSI IRQ binding, USB DAC low-latency, DAC lock & async SwitchHDD mount
 
 case "$1" in
   start)
     echo "[Piccolo-AX] Binding hardware IRQs & low-latency USB DAC parameters..."
     mkdir -p /etc/modprobe.d
     cat << 'EOF' > /etc/modprobe.d/piccolo-audio.conf
-options snd-usb-audio nrpacks=1 lowlatency=1
+options snd-usb-audio lowlatency=1
 EOF
-    if lsmod | grep -q "^snd_usb_audio"; then
-        modprobe -r snd_usb_audio 2>/dev/null && modprobe snd_usb_audio 2>/dev/null || true
-    fi
+
+    # Initialize exclusive DAC lockfile directory & node
+    mkdir -p /run/lock
+    chmod 1777 /run/lock 2>/dev/null || true
+    touch /run/lock/ax-dac.lock
+    chmod 0666 /run/lock/ax-dac.lock 2>/dev/null || true
 
     # Bind GTX 980 Ti MSI IRQ to Core 1 (0x02)
-    for irq in $(grep -i "nvidia" /proc/interrupts | awk -F: '{print $1}' | tr -d ' '); do
+    for irq in $(grep -i "nvidia" /proc/interrupts 2>/dev/null | awk -F: '{print $1}' | tr -d ' '); do
         echo 02 > "/proc/irq/${irq}/smp_affinity" 2>/dev/null || true
     done
 
     # Bind HiBy FC3 xHCI controller MSI IRQ to Core 0 (0x01)
-    FC3_BUS=$(lsusb | grep -iE "2fc6|HiBy" | awk '{print $2}' | sed 's/^0*//')
-    if [ -n "$FC3_BUS" ]; then
+    FC3_BUS=$(lsusb 2>/dev/null | grep -iE "2fc6|32bb|HiBy" | awk '{print $2}' | sed 's/^0*//' | head -n1)
+    if [ -n "$FC3_BUS" ] && [ -e "/sys/bus/usb/devices/usb${FC3_BUS}/../" ]; then
         XHCI_PCI=$(basename "$(readlink -f "/sys/bus/usb/devices/usb${FC3_BUS}/../")" 2>/dev/null || true)
-        for irq in $(grep "${XHCI_PCI}" /proc/interrupts | awk -F: '{print $1}' | tr -d ' '); do
-            echo 01 > "/proc/irq/${irq}/smp_affinity" 2>/dev/null || true
-        done
+        if [ -n "$XHCI_PCI" ]; then
+            for irq in $(grep -F "${XHCI_PCI}" /proc/interrupts 2>/dev/null | awk -F: '{print $1}' | tr -d ' '); do
+                echo 01 > "/proc/irq/${irq}/smp_affinity" 2>/dev/null || true
+            done
+        fi
     fi
 
     # Enable NVIDIA persistence mode (580.* legacy branch)
@@ -32,9 +37,11 @@ EOF
     # Stage RAM tmpfs shader & PGO directories
     mkdir -p /dev/shm/emu_cache /dev/shm/nv_cache /dev/shm/pgo
 
-    # Mount SwitchHDD asynchronously on Core 5 so spin-up never blocks boot
-    mkdir -p /userdata/roms/switch /userdata/roms/wiiu /userdata/roms/n64
-    taskset -c 5 sh -c 'mount -L SwitchHDD -o ro,noatime /userdata/roms/switch 2>/dev/null || true' &
+    # Only prepare /userdata rom mountpoints if SHARE / userdata is mounted, then mount SwitchHDD async on Core 5
+    if grep -qs "[[:space:]]/userdata[[:space:]]" /proc/mounts; then
+        mkdir -p /userdata/roms/switch /userdata/roms/wiiu /userdata/roms/n64
+        taskset -c 5 sh -c 'mount -L SwitchHDD -o ro,noatime /userdata/roms/switch 2>/dev/null || true' &
+    fi
     ;;
   stop)
     ;;
