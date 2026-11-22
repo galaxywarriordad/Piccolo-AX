@@ -1,5 +1,7 @@
 menu "Piccolo [AX] Console Appliance"
 
+menu "1. Core Runtime, Bootloader & Acceleration"
+
 config BR2_PACKAGE_AX_SDK
 	bool "ax-sdk (libax_core)"
 	default y
@@ -14,6 +16,23 @@ config BR2_PACKAGE_LIMINE
 	help
 	  Deterministic UEFI/BIOS bootloader for Piccolo [AX] mode-isolated
 	  boot entries (ax.mode=audio|upscaler|retro|desktop).
+
+config BR2_PACKAGE_LSFG_VK
+	bool "lsfg-vk 2.0.0+ (Implicit Vulkan Frame Generation)"
+	default y
+	help
+	  Vulkan 1.2 bindless FP32 frame-generation layer (requires user-supplied
+	  Lossless.dll placed in /userdata/system/lsfg/Lossless.dll).
+
+config BR2_PACKAGE_VMTOUCH
+	bool "vmtouch (MAP_POPULATE RAM Asset Pinner)"
+	default y
+	help
+	  Bulk pre-faults filtered game containers into DDR4 RAM (-dql).
+
+endmenu
+
+menu "2. AX Console & Classic Engines"
 
 config BR2_PACKAGE_EDEN_AX
 	bool "Eden Espresso Wave [AX] (Nintendo Switch)"
@@ -120,84 +139,31 @@ config BR2_PACKAGE_HATARI_AX
 	help
 	  Cycle-accurate Atari ST/STE/TT/Falcon emulator with ALSA MIDI and ax-sdk audio ring.
 
+endmenu
+
+menu "3. FLAC_AX Audio/Visual Studio & Upscaler"
+source "$BR2_EXTERNAL_PICCOLO_AX_PATH/package/flac-ax/Config.in"
+endmenu
+
+menu "4. Optional Desktop Workbench (piccolo-ax-desktop)"
+
 config BR2_PACKAGE_PICCOLO_AX_DESKTOP
-	bool "Piccolo-AX Desktop Workbench Layer (Opt-in < 35 MB C/C++ Suite)"
+	bool "Piccolo-AX Desktop Workbench Layer (Opt-in < 42 MB C/C++ Suite)"
 	default n
 	help
-	  Optional on-demand C/C++ desktop workbench (LXQt/XFCE, Falkon, GrafX2,
-	  LibreSprite, mtPaint, AzPainter, GHex, CPU-X, nvtop) with SHARE persistence.
+	  Optional on-demand C/C++ desktop workbench (LXQt/XFCE, PCManFM-Qt,
+	  Worker, Falkon, GrafX2, LibreSprite, mtPaint, AzPainter, MilkyTracker,
+	  mhWaveEdit, QASMixer, GHex, CPU-X, nvtop, htop) with SHARE persistence.
 
-if BR2_PACKAGE_PICCOLO_AX_DESKTOP && BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH != ""
-source "$BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH/buildroot/Config.in"
+if BR2_PACKAGE_PICCOLO_AX_DESKTOP
+	if BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH != ""
+		source "$BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH/buildroot/Config.in"
+	endif
+	if BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH = "" && BR2_EXTERNAL_PICCOLO_AX_PATH != ""
+		source "$BR2_EXTERNAL_PICCOLO_AX_PATH/../../piccolo-ax-desktop/buildroot/Config.in"
+	endif
 endif
 
-config BR2_PACKAGE_FLAC_AX
-	bool "FLAC_AX & [AX] Audio/Visual Studio (ESS Sabre + Akai MPK Mini MK3)"
-	default y
-	select BR2_PACKAGE_AX_SDK
-	select BR2_PACKAGE_FLAC
-	select BR2_PACKAGE_ALSA_LIB
-	select BR2_PACKAGE_SDL2
-	help
-	  Bit-perfect ESS Sabre FLAC player (flac_ax) and unified [AX]
-	  Audio/Visual Synth, Mixer & OpenGL Spectrum Studio (ax_av_studio).
-
-config BR2_PACKAGE_LSFG_VK
-	bool "lsfg-vk 2.0.0+ (Implicit Vulkan Frame Generation)"
-	default y
-	help
-	  Vulkan 1.2 bindless FP32 frame-generation layer (requires user-supplied
-	  Lossless.dll placed in /userdata/system/lsfg/Lossless.dll).
-
-config BR2_PACKAGE_VMTOUCH
-	bool "vmtouch (MAP_POPULATE RAM Asset Pinner)"
-	default y
-	help
-	  Bulk pre-faults filtered game containers into DDR4 RAM (-dql).
+endmenu
 
 endmenu
-```[cite: 27]
-
----
-
-### 2. `batocera-ax-external/configs/piccolo_x86_64_defconfig`
-
-```kconfig
-# --- Shared Pruned Qt6 Runtime for AX Emulators (Eden, RMG, Cemu) ---
-BR2_PACKAGE_QT6=y
-BR2_PACKAGE_QT6BASE=y
-BR2_PACKAGE_QT6BASE_GUI=y
-BR2_PACKAGE_QT6BASE_WIDGETS=y
-BR2_PACKAGE_QT6BASE_OPENGL=y
-BR2_PACKAGE_QT6BASE_VULKAN=y
-BR2_PACKAGE_QT6BASE_XCB=y
-# BR2_PACKAGE_QT6WAYLAND is not set
-BR2_PACKAGE_QT6BASE_DBUS=y
-BR2_PACKAGE_QT6BASE_NETWORK=y
-BR2_PACKAGE_QT6BASE_CONCURRENT=y
-BR2_PACKAGE_QT6SVG=y
-BR2_PACKAGE_QT6WEBSOCKETS=y
-
-# --- Bootloader, AX Core, Emulators & Appliance Tools ---
-BR2_PACKAGE_LIMINE=y
-BR2_PACKAGE_AX_SDK=y
-BR2_PACKAGE_EDEN_AX=y
-BR2_PACKAGE_CEMU_LATTE_AX=y
-BR2_PACKAGE_RMG_AX=y
-BR2_PACKAGE_CANNONBALL_AX=y
-BR2_PACKAGE_FRONTIER_AX=y
-BR2_PACKAGE_BLASTEM_AX=y
-BR2_PACKAGE_FLYCAST_AX=y
-BR2_PACKAGE_HATARI_AX=y
-BR2_PACKAGE_FLAC_AX=y
-BR2_PACKAGE_LSFG_VK=y
-BR2_PACKAGE_VMTOUCH=y
-BR2_STRIP_strip=y
-
-# --- Strip Bloat to Stay Under 512 MB ---
-# BR2_PACKAGE_QT6BASE_EXAMPLES is not set
-# BR2_PACKAGE_QT6BASE_TESTS is not set
-# BR2_PACKAGE_QT6WEBENGINE is not set
-# BR2_PACKAGE_QT6MULTIMEDIA is not set
-# BR2_PACKAGE_QT6DECLARATIVE is not set
-
