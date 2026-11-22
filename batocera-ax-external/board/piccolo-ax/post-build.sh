@@ -64,8 +64,9 @@ else
         "${TARGET_DIR}/usr/local/bin/mtpaint"
 fi
 
-# 4. Ensure init hooks are executable
+# 4. Ensure init hooks & mode launcher are executable
 chmod +x "${TARGET_DIR}/etc/init.d/S01piccolo-isolate" \
          "${TARGET_DIR}/etc/init.d/S02piccolo-hw" \
          "${TARGET_DIR}/etc/init.d/K01piccolo-sync" \
+         "${TARGET_DIR}/usr/bin/ax-mode-cli" \
          "${TARGET_DIR}/usr/bin/verify_ax_appliance.sh" 2>/dev/null || true
