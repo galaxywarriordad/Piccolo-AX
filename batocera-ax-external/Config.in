@@ -7,10 +7,26 @@ config BR2_PACKAGE_AX_SDK
 	  Shared dependency-free C++20 deterministic hardware runtime
 	  for The Silicon Preservation Society emulators.
 
+config BR2_PACKAGE_LIMINE
+	bool "Limine Bootloader (UEFI / BIOS)"
+	depends on BR2_x86_64
+	default y
+	help
+	  Deterministic UEFI/BIOS bootloader for Piccolo [AX] mode-isolated
+	  boot entries (ax.mode=audio|upscaler|retro|desktop).
+
 config BR2_PACKAGE_EDEN_AX
 	bool "Eden Espresso Wave [AX] (Nintendo Switch)"
 	default y
 	select BR2_PACKAGE_AX_SDK
+	select BR2_PACKAGE_QT6
+	select BR2_PACKAGE_QT6BASE
+	select BR2_PACKAGE_QT6BASE_GUI
+	select BR2_PACKAGE_QT6BASE_WIDGETS
+	select BR2_PACKAGE_QT6BASE_OPENGL
+	select BR2_PACKAGE_QT6BASE_VULKAN
+	select BR2_PACKAGE_QT6SVG
+	select BR2_PACKAGE_QT6WEBSOCKETS
 	help
 	  Deterministic Nintendo Switch emulator compiled with standalone
 	  Clang 23.1+ (ThinLTO + 3-Phase PGO) and linked against ax-sdk.
@@ -19,6 +35,14 @@ config BR2_PACKAGE_CEMU_LATTE_AX
 	bool "Cemu Latte [AX] (Nintendo Wii U)"
 	default y
 	select BR2_PACKAGE_AX_SDK
+	select BR2_PACKAGE_QT6
+	select BR2_PACKAGE_QT6BASE
+	select BR2_PACKAGE_QT6BASE_GUI
+	select BR2_PACKAGE_QT6BASE_WIDGETS
+	select BR2_PACKAGE_QT6BASE_OPENGL
+	select BR2_PACKAGE_QT6BASE_VULKAN
+	select BR2_PACKAGE_QT6SVG
+	select BR2_PACKAGE_QT6WEBSOCKETS
 	help
 	  Deterministic Nintendo Wii U emulator compiled with standalone
 	  Clang 23.1+ (ThinLTO + 3-Phase PGO) and linked against ax-sdk.
@@ -132,3 +156,50 @@ config BR2_PACKAGE_VMTOUCH
 	  Bulk pre-faults filtered game containers into DDR4 RAM (-dql).
 
 endmenu
+```[cite: 27]
+
+---
+
+### 2. `batocera-ax-external/configs/piccolo_x86_64_defconfig`
+
+```kconfig
+# --- Shared Pruned Qt6 Runtime for AX Emulators (Eden, RMG, Cemu) ---
+BR2_PACKAGE_QT6=y
+BR2_PACKAGE_QT6BASE=y
+BR2_PACKAGE_QT6BASE_GUI=y
+BR2_PACKAGE_QT6BASE_WIDGETS=y
+BR2_PACKAGE_QT6BASE_OPENGL=y
+BR2_PACKAGE_QT6BASE_VULKAN=y
+BR2_PACKAGE_QT6BASE_XCB=y
+# BR2_PACKAGE_QT6WAYLAND is not set
+BR2_PACKAGE_QT6BASE_DBUS=y
+BR2_PACKAGE_QT6BASE_NETWORK=y
+BR2_PACKAGE_QT6BASE_CONCURRENT=y
+BR2_PACKAGE_QT6SVG=y
+BR2_PACKAGE_QT6WEBSOCKETS=y
+
+# --- Bootloader, AX Core, Emulators & Appliance Tools ---
+BR2_PACKAGE_LIMINE=y
+BR2_PACKAGE_AX_SDK=y
+BR2_PACKAGE_EDEN_AX=y
+BR2_PACKAGE_CEMU_LATTE_AX=y
+BR2_PACKAGE_RMG_AX=y
+BR2_PACKAGE_CANNONBALL_AX=y
+BR2_PACKAGE_FRONTIER_AX=y
+BR2_PACKAGE_BLASTEM_AX=y
+BR2_PACKAGE_FLYCAST_AX=y
+BR2_PACKAGE_HATARI_AX=y
+BR2_PACKAGE_FLAC_AX=y
+BR2_PACKAGE_LSFG_VK=y
+BR2_PACKAGE_VMTOUCH=y
+BR2_STRIP_strip=y
+
+# --- Strip Bloat to Stay Under 512 MB ---
+# BR2_PACKAGE_QT6BASE_EXAMPLES is not set
+# BR2_PACKAGE_QT6BASE_TESTS is not set
+# BR2_PACKAGE_QT6WEBENGINE is not set
+# BR2_PACKAGE_QT6MULTIMEDIA is not set
+# BR2_PACKAGE_QT6DECLARATIVE is not set
+```[cite: 26]
+
+*(Remember to also keep `source "$BR2_EXTERNAL_PICCOLO_AX_PATH/package/limine/Config.in"` wired in if `package/limine/Config.in` is sourced outside `batocera-ax-external/Config.in`.)*
