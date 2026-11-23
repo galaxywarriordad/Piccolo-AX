@@ -97,6 +97,8 @@ def build_emulator_cmd(system_name: str, rom_path: Path) -> list[str]:
         emu_args = ["/usr/bin/hatari", "--fullscreen", str(rom_path)]
     elif system_name in ("amiga", "amiga500", "amiga1200", "amigacd32"):
         emu_args = ["/usr/bin/amiberry", "--autoload", str(rom_path), "-G"]
+    elif system_name in ("fbneo", "neogeo", "cps1", "cps2", "cps3", "arcade"):
+        emu_args = ["/usr/bin/retroarch", "-f", "-L", "/usr/lib/libretro/fbneo_libretro.so", str(rom_path)]
     else:
         emu_args = ["/usr/bin/eden-cli", "-f", "-g", str(rom_path)]
     if Path("/sys/fs/cgroup/eden.slice").exists():
