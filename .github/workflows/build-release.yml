@@ -1,0 +1,50 @@
+name: Build Release Artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      defconfig:
+        description: "Piccolo-AX Buildroot defconfig"
+        type: string
+        default: "piccolo_x86_64_defconfig"
+
+jobs:
+  build-image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Free Runner Disk Space (~25 GB Reclaimed)
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h
+
+      - name: Checkout Piccolo-AX
+        uses: actions/checkout@v5
+        with:
+          path: Piccolo-AX
+
+      - name: Install Buildroot Host Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential gcc g++ make binutils patch gzip bzip2 perl tar cpio \
+            unzip rsync file bc wget git python3 libncurses-dev libssl-dev \
+            dosfstools mtools erofs-utils zip ca-certificates
+
+      - name: Clone Buildroot
+        run: |
+          git clone --depth=1 https://github.com buildroot
+
+      - name: Configure & Compile Piccolo-AX Image
+        run: |
+          cd buildroot
+          make BR2_EXTERNAL="${GITHUB_WORKSPACE}/Piccolo-AX/batocera-ax-external" "${{ inputs.defconfig }}"
+          make -j"$(nproc)"
+
+      - name: Upload Piccolo-AX Release Image
+        uses: actions/upload-artifact@v4
+        with:
+          name: piccolo-ax-image-x86_64
+          path: buildroot/output/images/*
+          compression-level: 6
+          retention-days: 14
