@@ -1,0 +1,108 @@
+# 🎧 HiBy FC3 (`ESS ES9281AC Pro`) & The `Piccolo` Transport: Engineering Review & Architecture Guide
+
+**A deep-dive audiophile and systems-engineering examination of how a pocket-sized ESS SABRE USB-C dongle—paired with a tickless, core-isolated Linux transport—delivers genuine hi-fi composure on both a handheld console and a bare-metal desktop appliance.**
+
+---
+
+## ☕ Introduction: Why the Transport Matters as Much as the DAC
+
+In the world of compact USB-C DAC/amplifiers, it is easy to focus entirely on headline specifications: `32-bit / 384 kHz` PCM support, `DSD128` playback, or the reassuring presence of an ESS SABRE badge. Yet anyone who has listened closely through resolving wired headphones or sensitive in-ear monitors knows that a DAC is only as composed as the digital stream feeding it.
+
+On a conventional computer or handheld operating system, your music shares the processor with window compositors, background network daemons, power-saving USB autosuspend timers, and user-space audio mixers that silently resample `44.1 kHz` or `96 kHz` masters into a fixed `48 kHz` system rate. The result is subtle—and sometimes not so subtle: soft micro-clicks between tracks, slightly blurred transient edges, and low-level timing hash that robs acoustic recordings of air and rhythmic drive.
+
+Enter the pairing of the **HiBy FC3** (`ESS ES9281AC Pro` / `ES9281PRO`) with **The Silicon Preservation Society's** `Piccolo` ecosystem—spanning both the pocket-sized **`Piccolo-2go`** (`aarch64` Rockchip RK3326 handheld OS for the **BATLEXP G350** and **R36S**) and **`Piccolo-AX`** (the bare-metal `x86_64` `Linux 6.12-rt` console and A/V appliance). Rather than treating the FC3 as a casual plug-and-play desktop accessory, `Piccolo` engineers the entire operating system around it as a dedicated, bit-perfect digital transport.
+
+---
+
+## 🔌 1\. Inside the HiBy FC3: Internal Signal Chain & Hardware Schematic
+
+Measuring roughly `45 × 13 × 9 mm` and weighing just `~9.1 g` in its machined aluminum housing, the **HiBy FC3** strips away internal batteries and wireless circuitry in favor of a clean, bus-powered USB Audio Class 2.0 (`UAC 2.0`) signal path built around ESS Technology's **ES9281AC Pro / ES9281PRO** single-chip USB audio controller and SABRE DAC architecture.
+
+```
++----------------------------------------------------------------------------------------+
+|                      HIBY FC3 HARDWARE SIGNAL CHAIN (ES9281AC PRO)                     |
+|                                                                                        |
+|  [ Host USB-C Bus ] --(USB 2.0 / UAC 2.0, 5V)--> [ ES9281AC Pro / ES9281PRO ]        |
+|          |                                                        |     |     |        |
+|          +--> [ Side Keys: Vol + / Vol - ] -----------------------+     |     |        |
+|          +--> [ Status Indicator: RGB LED / Format ] -------------------+     |     |        |
+|                                                                               |        |
+|                                   +-------------------------------------------+        |
+|                                   |                                             |        |
+|                                   v                                             v        |
+|                    [ 32-bit SABRE DAC & Analog Stage ]                 [ ADC / Mic ]   |
+|                                   |                                             ^        |
+|                                   v                                             |        |
+|                  [ 3.5 mm TRS / CTIA Output Jack ] <----(Mic / CTIA)------------+        |
+|                  (Up to 70 mW @ 32 Ohm; S32_LE & DoP)                                  |
++----------------------------------------------------------------------------------------+
+```
+
+### 🔍 Key Architectural Traits of the ES9281AC Pro Stage
+
+* **Pure UAC 2.0 High-Speed USB Interface:** Negotiates directly over USB 2.0 High-Speed (`480 Mbps`) in `UAC 2.0` mode, drawing operating power from the host `5V` VBUS rail without needing driver installation on compliant Linux `snd-usb-audio` kernels.  
+* **Integrated SABRE Conversion & Hardware Gain:** Combines the USB receiver, digital filtering, `32-bit` SABRE DAC, and `30` / `32`\-step hardware volume attenuator (`[0, 31]` with onboard volume memory) inside a single silicon package—preserving full dynamic range without resorting to destructive digital pre-attenuation in software.  
+* **High-Resolution Format & Rate Handling:** Accepts native `32-bit` integer PCM (`S32_LE`) from `44.1 kHz` up to **`384 kHz`**, **`DSD64` (`176.4 kHz`)** and **`DSD128` (`352.8 kHz`)** via **DoP (DSD over PCM)**, and MQA rendering (`8x` / up to `16x` depending on hardware revision), signaling lock state via its status LED/display.  
+* **Focused `3.5 mm` Analog Output:** Delivers up to **`70 mW` into `32 Ohm`** (`1.3 Vrms` on early `fc3_1v3` hardware revisions) via a `3.5 mm` CTIA-compatible jack, flanked by tactile `Volume +` and `Volume -` buttons that keep level adjustments right at the DAC stage.
+
+| Subsystem | HiBy FC3 Engineering Characteristic | Sonic & Operational Implication |
+| :---- | :---- | :---- |
+| **USB & Clocking** | USB 2.0 High-Speed, UAC 2.0, synchronous mode operation | Demands steady `5V` VBUS and deterministic host USB scheduling free from autosuspend or IRQ contention. |
+| **PCM & DSD Path** | PCM up to `32-bit / 384 kHz`; `DSD64–DSD128` via **DoP** | Delivers uncolored, bit-exact playback whenever the host bypasses software sample-rate conversion. |
+| **Volume & Control** | Hardware volume steps (`0–31`) \+ volume memory \+ RGB/OLED state | Enables clean gain matching for sensitive IEMs (`16–32 Ohm`) or wired headphones without truncating bit depth. |
+| **Chassis & Power** | Bus-powered (`~9.1 g` aluminum shell), standby when idle | Runs cool during extended listening, provided the host prevents aggressive USB link sleep states. |
+
+---
+
+## 🎛️ 2\. How `Piccolo` Turns the HiBy FC3 Into a Dedicated Digital Transport
+
+A great DAC stage can still sound restless if the host operating system feeds it erratically. Across both **`Piccolo-2go`** and **`Piccolo-AX`**, the operating system is stripped of desktop mixers (`PipeWire`, `PulseAudio`, and software resampling plugins) and partitioned at the silicon level so **Core 0 (`0x01`)** acts as an isolated, real-time audio clock and USB interrupt plane.
+
+```
++-----------------------------------------------------------------------------------------+
+|                       PICCOLO AUDIO ROUTING & ISOLATION TOPOLOGY                        |
+|                                                                                         |
+|  +----------------------------------------+   +---------------------------------------+ |
+|  | Piccolo-2go (aarch64 RK3326)           |   | Piccolo-AX (x86_64 Linux 6.12-rt)     | |
+|  |                                        |   |                                       | |
+|  | * Core 0 (0x01): SCHED_FIFO 80         |   | * Core 0 (0x01): SCHED_FIFO 80/99     | |
+|  |     ALSA S32_LE / DoP + DWC2 OTG IRQ   |   |     ALSA hw:CARD=FC3,DEV=0 + xHCI IRQ | |
+|  | * 99-ax-2go-otg.rules:                 |   | * /run/lock/ax-dac.lock (flock -n)    | |
+|  |     power/control="on" (no autosuspend)|   |     Serializes audio & upscaler modes | |
+|  | * ax-audio-route:                      |   | * Zero PipeWire / PulseAudio          | |
+|  |     Connect & Retry + RK817 fallback   |   |     Direct hardware PCM output        | |
+|  | * ax-powerd: SIGUSR1 clean DAC         |   | * RAM-backed caches & atomic          | |
+|  |     release on 1.5s KEY_POWER hold     |   |     .tar.zst exit persistence         | |
+|  +-------------------+--------------------+   +-------------------+-------------------+ |
+|                      |                                           |                      |
+|                      +---------------------+---------------------+                      |
+|                                            |                                            |
+|                                            v                                            |
+|                       [ HiBy FC3 (ES9281AC Pro -- Bit-Perfect) ]                        |
++-----------------------------------------------------------------------------------------+
+```
+
+### 🎮 A. On `Piccolo-2go`: Pocket-Sized Precision on Rockchip RK3326
+
+On the **BATLEXP G350** and **R36S** handhelds, the quad-core `ARM Cortex-A35` (`RK3326`) uses an in-order pipeline with a shared `256 KB` L2 cache. Left to standard Linux scheduling, SD card reads or GPU page flips can easily starve an external USB-C OTG DAC. `Piccolo-2go` solves this with four targeted measures:
+
+* **Strict `1:2:1` Core & IRQ Isolation (`Core 0` Dedicated to Audio):** Tickless boot flags (`isolcpus=0,1,2 nohz_full=0,1,2 rcu_nocbs=0,1,2`) and `S01piccolo-2go-isolate` pin the `DWC2` USB-C OTG interrupt and the `SCHED_FIFO` (priority `80`) ALSA `S32_LE` writer (`192`\-frame / `4.00 ms` period) exclusively to **Core 0 (`0x01`)**, keeping `Panfrost` `KMS/DRM` scanout (`Core 1`), emulation/DSP (`Core 2`), and `dwmmc` SD DMA / `1024 MB` `LZ4` ZRAM (`Core 3`) completely out of the audio path.  
+* **Zero Autosuspend & `fc3_1v3` Gain Staging:** `99-ax-2go-otg.rules` detects the HiBy FC3 (`VID 0x32BB`) on attach and immediately locks `power/control="on"` so the DAC never enters a sleep state between tracks. Software resampling is disabled (`snd_pcm_hw_params_set_rate_resample(0)`), and `FLAC_AX` pairs `64 MiB` RAM file preloading on `Core 3` with calibrated `fc3_1v3` attenuator presets (`--volume 0.95` for portable speakers, `0.65` for wired headphones, and `0.35` for sensitive `16–32 Ohm` IEMs).  
+* **Interactive *Connect & Retry* with Pop-Free `RK817` Fallback:** `/usr/sbin/ax-audio-route` checks for the external DAC at launch and presents an interactive *Connect & Retry* (`[R]`) or skip (`[S]`) prompt if it is unplugged, switching cleanly to the internal **Rockchip RK817** codec (`3.5 mm` jack \+ `1W` mono speaker) with pop-free *Playback Path* control when used untethered.  
+* **Graceful DAC Release (`ax-powerd`):** Holding `KEY_POWER` for `1.5` seconds (or `FN + Power`) signals `ax-powerd` on `Core 3` to send `SIGUSR1` so the HiBy FC3 closes its PCM stream cleanly before storage unmounts and the `RK817` PMIC powers down.
+
+### 🖥️ B. On `Piccolo-AX`: Bare-Metal `x86_64` Real-Time Composure
+
+On the `x86_64` `Linux 6.12-rt` (`PREEMPT_RT`) appliance, `Piccolo-AX` scales the same philosophy to multi-core desktop silicon:
+
+* **Physical xHCI Separation & Cache-Local Core 0 Loop:** The HiBy FC3 is placed on an isolated USB xHCI host controller whose MSI interrupt is pinned to **Core 0 (`0x01`)**, paired with low-latency USB audio parameters (`lowlatency=1`) and direct `hw:CARD=FC3,DEV=0` `S32_LE` output (`48 kHz` / `96`\-frame `2.00 ms` target ring with `128`\-frame `2.67 ms` fallback) so PCM buffers stay hot in Core 0's private L2 cache.  
+* **Exclusive Hardware Arbitration (`/run/lock/ax-dac.lock`):** Because `Piccolo-AX` boots into isolated workload modes via Limine (`audio`, `upscaler`, `retro`, `desktop`), `ax-mode-cli` guards `hw:CARD=FC3,DEV=0` with a non-blocking `flock -n` lockfile (`/run/lock/ax-dac.lock`), ensuring `flac_ax`, `ax_av_studio`, and `ax_video_upscaler` never contend for the DAC simultaneously.  
+* **RAM-Resident Silence (`toram` EROFS):** Because the entire `< 512 MB` appliance rootfs executes from RAM (`toram`) and dirty caches flush atomically (`K01piccolo-sync`) only on exit, storage traffic never intrudes on playback.
+
+---
+
+## 🏆 Verdict & Conclusion: Small Dongle, Serious Discipline
+
+On paper, the **HiBy FC3** is an unassuming `9.1-gram` USB-C dongle—a neat aluminum bar with two volume buttons, an indicator LED, and a `3.5 mm` socket. Yet its `ESS ES9281AC Pro` architecture possesses the core ingredients audiophiles actually care about: genuine `32-bit / 384 kHz` `S32_LE` PCM, `DSD128` via `DoP`, hardware volume memory, and enough clean output drive (`70 mW @ 32 Ohm`) to bring sensitive IEMs and efficient full-size headphones to life without bulk or battery anxiety.
+
+What elevates it inside **`Piccolo-2go`** and **`Piccolo-AX`** is the refusal to compromise the transport feeding it. By stripping out user-space audio mixers, locking USB power states, binding xHCI/OTG interrupts to a tickless **Core 0 (`0x01`)**, and running the operating system from immutable RAM-backed images, `Piccolo` removes the exact sources of timing jitter and background noise that usually hold compact USB DACs back. Whether tucked into a pocket alongside a BATLEXP G350 or anchored to a bare-metal `Linux 6.12-rt` workstation, the result is the same: black backgrounds, crisp leading edges, and the unmistakable sense that nothing is standing between the master file and your headphones.
