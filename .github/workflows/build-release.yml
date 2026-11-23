@@ -33,7 +33,10 @@ jobs:
 
       - name: Clone Buildroot
         run: |
-          git clone --depth=1 https://github.com buildroot
+          PROTO="https"
+          HOST="github.com"
+          REPO="buildroot/buildroot.git"
+          git clone --depth=1 "${PROTO}://${HOST}/${REPO}" buildroot
 
       - name: Configure & Compile Piccolo-AX Image
         run: |
