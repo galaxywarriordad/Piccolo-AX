@@ -4,10 +4,10 @@
 
 The **AX Project** separates shared low-level C++20 silicon abstractions (`ax-sdk`) from platform-, emulator-, and workbench-specific repositories so upstream rebases stay clean while hardware isolation logic remains unified across Windows 10/11 and bare-metal Linux.
 
-```
+```text
                     +-------------------------------------------------------+
                     |                        ax-sdk                         |
-                    |        https://github.com/galaxywarriordad/ax-sdk     |
+                    |      (https://github.com/galaxywarriordad/ax-sdk)     |
                     |  Shared C++20 Silicon Core, Dynamic SMT/CCX Topology, |
                     |  Platform Shims, Telemetry Schemas & Master Specs     |
                     +-------------------------------------------------------+
@@ -39,7 +39,7 @@ The **AX Project** separates shared low-level C++20 silicon abstractions (`ax-sd
 ### Repository Breakdown & Lineage
 
 | Repository | Host & Canonical URL | Primary Role & Lineage |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | **`ax-sdk`** | **GitHub:** `galaxywarriordad/ax-sdk` | Shared, zero-dependency C++20 silicon library (`libax_core` / `ax::core`), dynamic Intel SMT / AMD CCX topology resolver, Win32/Linux platform shims, and cross-project master specs. |
 | **`Eden-Espresso-Wave-AX`** | **Forgejo:** `galaxywarriordad/Eden-Espresso-Wave-AX` | **Windows 10/11 Switch Engine Master** — Direct fork of upstream Eden hosted on Forgejo for frictionless PR cherry-picks; features LLVM `clang-cl` 23+ 3-stage PGO, FlexASIO/WASAPI Exclusive audio, Intel QSV offload, and Maxwell GM200 VRAM shields. |
 | **`Piccolo-AX`** | **GitHub:** `galaxywarriordad/Piccolo-AX` | **Batocera Linux Branch of `Eden-Espresso-Wave-AX`** — Adapts the Espresso Wave `[AX]` engine for bare-metal Linux (`Linux 6.12-rt`, direct ALSA `SCHED_FIFO`, `iHD` VA-API `dma_buf`) and packages all `[AX]` engines and studios via `batocera-ax-external/` into a `< 512 MB` `toram` EROFS USB 3.0 console appliance. |
@@ -50,8 +50,8 @@ The **AX Project** separates shared low-level C++20 silicon abstractions (`ax-sd
 
 ### Cross-Repository Dependency & Merge Flow
 
-* **Shared Silicon Core (`ax-sdk`):** `Eden-Espresso-Wave-AX`, `Piccolo-AX`, `Cemu-Latte-AX`, `Generation-X-AX`, and `FLAC_AX` all consume `ax-sdk` (`v1.36.1`) as a pinned CMake dependency (`ax::core`), inheriting identical core-pinning, `LockFreeStereoRing` audio buffers, and `/dev/shm/ax_telemetry` jitter counters without duplicating C++20 code.  
-* **Unified Appliance Assembly (`Piccolo-AX`):** `batocera-ax-external/` pulls `Eden-Espresso-Wave-AX`, `Cemu-Latte-AX`, all `Generation-X-AX` engine targets, and `FLAC_AX` (`flac_ax` \+ `ax_av_studio`, coordinated via `/run/lock/ax-dac.lock` DAC handoff) into a single immutable `rootfs.erofs` image—with optional `piccolo-ax-desktop` workbench layering enabled via `BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH`.
+* **Shared Silicon Core (`ax-sdk`):** `Eden-Espresso-Wave-AX`, `Piccolo-AX`, `Cemu-Latte-AX`, `Generation-X-AX`, and `FLAC_AX` all consume `ax-sdk` (`v1.36.2`) as a pinned CMake dependency (`ax::core`), inheriting identical core-pinning, `LockFreeStereoRing` audio buffers, and `/dev/shm/ax_telemetry` jitter counters without duplicating C++20 code.
+* **Unified Appliance Assembly (`Piccolo-AX`):** `batocera-ax-external/` pulls `Eden-Espresso-Wave-AX`, `Cemu-Latte-AX`, all `Generation-X-AX` engine targets, and `FLAC_AX` (`flac_ax` + `ax_av_studio`, coordinated via `/run/lock/ax-dac.lock` DAC handoff) into a single immutable `rootfs.erofs` image—with optional `piccolo-ax-desktop` workbench layering enabled via `BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH`.
 
 ---
 
@@ -59,20 +59,20 @@ The **AX Project** separates shared low-level C++20 silicon abstractions (`ax-sd
 
 ### Core Architectural Constraints & Design Principles
 
-* **Immutable `toram` EROFS Rootfs (`<= 512 MiB` / `524288 KB`):** Packed with `mkfs.erofs -zlz4hc,9 -T0 --force-uid=0 --force-gid=0` so the read-only appliance rootfs fits comfortably in RAM with zero runtime flash wear.  
-* **Journal-Free `ext4` `SHARE` Partition (`-O ^has_journal`):** Mounted on `/userdata` to eliminate ext4 journal write amplification on Samsung FIT Plus (`64 GB` `MUF-64AB/APC` and `128 GB`) USB flash storage.  
-* **First-Boot Dynamic Expansion (`ax-grow-share.sh`):** Keeps the build-time image compact (`4096 MiB` `BATOCERA` FAT32 \+ `2048 MiB` default `SHARE` ext4) so a single flash image works across both `64 GB` and `128 GB` drives, then relocates the GPT backup header (`sgdisk -e`), grows partition 2 to `100%`, and expands the `ext4` filesystem (`resize2fs`) on first boot.  
-* **CPU Core Isolation & IRQ Pinning:**  
-  * **Cores `0-4`:** Isolated domain (`isolcpus=managed_irq,domain,0-4`, `nohz_full=0-4`, `rcu_nocbs=0-4`, and cgroup v2 `eden.slice` `cpuset.cpus=0-4`), with Core `0` (`0x01`) hosting low-latency USB DAC / xHCI MSI IRQs and real-time audio (`SCHED_FIFO` priority `80`) and Core `1` (`0x02`) hosting NVIDIA GPU (`GTX 980 Ti` / `580.*` legacy branch) MSI IRQs.  
-  * **Core `5` (`0x20`):** Quarantined target for unbound kernel workqueues, default SMP IRQ affinity, `512 MB` LZ4 `zram0` swap (`swapon -p 100`), and asynchronous `SwitchHDD` mounting.  
-* **RAM-Resident Caches & Atomic Exit Persistence (`K01piccolo-sync`):** Emulator caches, PGO profiles, and NVIDIA caches stage in `/dev/shm/emu_cache`, `/dev/shm/pgo`, and `/dev/shm/nv_cache` during runtime and flush atomically (`.tmp.$$` \-\> `.tar.zst`) to `/userdata/system/ax-sync/` on shutdown/stop.  
+* **Immutable `toram` EROFS Rootfs (`<= 512 MiB` / `524288 KB`):** Packed with `mkfs.erofs -zlz4hc,9 -T0 --force-uid=0 --force-gid=0` so the read-only appliance rootfs fits comfortably in RAM with zero runtime flash wear.
+* **Journal-Free `ext4` `SHARE` Partition (`-O ^has_journal`):** Mounted on `/userdata` to eliminate ext4 journal write amplification on Samsung FIT Plus (`64 GB` `MUF-64AB/APC` and `128 GB`) USB flash storage.
+* **First-Boot Dynamic Expansion (`ax-grow-share.sh`):** Keeps the build-time image compact (`4096 MiB` `BATOCERA` FAT32 + `2048 MiB` default `SHARE` ext4) so a single flash image works across both `64 GB` and `128 GB` drives, then relocates the GPT backup header (`sgdisk -e`), grows partition 2 to `100%`, and expands the `ext4` filesystem (`resize2fs`) on first boot.
+* **CPU Core Isolation & IRQ Pinning:**
+  * **Cores `0–4`:** Isolated domain (`isolcpus=managed_irq,domain,0-4`, `nohz_full=0-4`, `rcu_nocbs=0-4`, and cgroup v2 `eden.slice` `cpuset.cpus=0-4`), with Core `0` (`0x01`) hosting low-latency USB DAC / xHCI MSI IRQs and real-time audio (`SCHED_FIFO` priority `80`) and Core `1` (`0x02`) hosting NVIDIA GPU (`GTX 980 Ti` / `580.*` legacy branch) MSI IRQs.
+  * **Core `5` (`0x20`):** Quarantined target for unbound kernel workqueues, default SMP IRQ affinity, `512 MB` LZ4 `zram0` swap (`swapon -p 100`), and asynchronous `SwitchHDD` mounting.
+* **RAM-Resident Caches & Atomic Exit Persistence (`K01piccolo-sync`):** Emulator caches, PGO profiles, and NVIDIA caches stage in `/dev/shm/emu_cache`, `/dev/shm/pgo`, and `/dev/shm/nv_cache` during runtime and flush atomically (`.tmp.$$` -> `.tar.zst`) to `/userdata/system/ax-sync/` on shutdown/stop.
 * **Exclusive DAC Locking (`/run/lock/ax-dac.lock`):** Serializes real-time access to `hw:CARD=FC3,DEV=0` (HiBy FC3 / ESS DAC) via `flock -n` in `ax-mode-cli` across `audio` (`flac_ax`, `ax_av_studio`) and `upscaler` (`ax_video_upscaler`) modes.
 
 ---
 
 ## 📜 Reference Code & Configuration Suite
 
-### 1\. `batocera-ax-external/board/piccolo-ax/post-build.sh`
+### 1. `batocera-ax-external/board/piccolo-ax/post-build.sh`
 
 ```sh
 #!/usr/bin/env bash
@@ -150,7 +150,7 @@ chmod +x "${TARGET_DIR}/etc/init.d/S01piccolo-isolate" \
          "${TARGET_DIR}/usr/bin/verify_ax_appliance.sh" 2>/dev/null || true
 ```
 
-### 2\. `batocera-ax-external/board/piccolo-ax/post-image.sh`
+### 2. `batocera-ax-external/board/piccolo-ax/post-image.sh`
 
 ```sh
 #!/usr/bin/env bash
@@ -256,9 +256,9 @@ fi
 echo "[Piccolo-AX] Built ${DISK_IMG} (profile=${FIT_PROFILE}, SHARE=${SHARE_PART_MIB} MiB)."
 ```
 
-### 3\. `batocera-ax-external/board/piccolo-ax/limine.conf`
+### 3. `batocera-ax-external/board/piccolo-ax/limine.conf`
 
-```
+```text
 timeout: 3
 default_entry: 3
 remember_last_entry: yes
@@ -294,7 +294,7 @@ remember_last_entry: yes
     cmdline: root=/dev/ram0 toram isolcpus=managed_irq,domain,0-4 nohz_full=0-4 rcu_nocbs=0-4 default_hugepagesz=1G hugepagesz=1G hugepages=6 hugepagesz=2M hugepages=1024 processor.max_cstate=0 skew_tick=1 pcie_aspm=off mitigations=off usbcore.autosuspend=-1 usbhid.jspoll=1 ax.mode=retro ax.dac_lock=/run/lock/ax-dac.lock piccolo.rootfs=rootfs.erofs.prev
 ```
 
-### 4\. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/usr/bin/ax-grow-share.sh`
+### 4. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/usr/bin/ax-grow-share.sh`
 
 ```sh
 #!/bin/sh
@@ -341,7 +341,7 @@ else
     part_num="$(echo "$share_dev" | sed -n 's/.*[^0-9]\([0-9][0-9]*\)$/\1/p')"
 fi
 
-if [ ! -b "$disk_dev" ] || [ -z "$part_num" ]; then
+if [ ! -b "$disk_dev" ] \vert{}\vert{} [ -z "$part_num" ]; then
     log_warn "Unable to resolve parent disk or partition number for '$share_dev'."
     exit 0
 fi
@@ -383,7 +383,7 @@ elif command -v sfdisk >/dev/null 2>&1; then
     echo ", +" | sfdisk -N "$part_num" --no-reread "$disk_dev" >/dev/null 2>&1 || true
 fi
 
-partprobe "$disk_dev" 2>/dev/null || blockdev --rereadpt "$disk_dev" 2>/dev/null || true
+partprobe "$disk_dev" 2>/dev/null \vert{}\vert{} blockdev --rereadpt "$disk_dev" 2>/dev/null || true
 udevadm settle 2>/dev/null || sleep 1
 
 # Refresh blkid cache and re-resolve device node if needed
@@ -407,7 +407,7 @@ else
 fi
 ```
 
-### 5\. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/etc/init.d/S01piccolo-isolate`
+### 5. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/etc/init.d/S01piccolo-isolate`
 
 ```sh
 #!/bin/sh
@@ -458,7 +458,7 @@ esac
 exit 0
 ```
 
-### 6\. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/etc/init.d/S02piccolo-hw`
+### 6. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/etc/init.d/S02piccolo-hw`
 
 ```sh
 #!/bin/sh
@@ -512,7 +512,7 @@ esac
 exit 0
 ```
 
-### 7\. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/etc/init.d/K01piccolo-sync`
+### 7. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/etc/init.d/K01piccolo-sync`
 
 ```sh
 #!/bin/sh
@@ -525,11 +525,11 @@ STAGE_DIR="${SHARE_MOUNT}/system/ax-sync"
 LOG_TAG="[Piccolo-AX sync]"
 
 log_info() {
-    echo "${LOG_TAG} $*"
+    echo "${LOG_TAG}$*"
 }
 
 log_warn() {
-    echo "${LOG_TAG}[WARN] $*" >&2
+    echo "${LOG_TAG}[WARN]$*" >&2
 }
 
 is_share_mounted() {
@@ -554,7 +554,7 @@ pack_dir_atomic() {
     tmp_tar="${dest_tar}.tmp.$$"
 
     if command -v zstd >/dev/null 2>&1; then
-        tar -C "$src_dir" -cf - . 2>/dev/null | zstd -3 -T0 -q -o "$tmp_tar" 2>/dev/null || {
+        tar -C "$src_dir" -cf - . 2>/dev/null \vert{} zstd -3 -T0 -q -o "$tmp_tar" 2>/dev/null || {
             rm -f "$tmp_tar"
             log_warn "Failed compressing '$src_dir' -> '$dest_tar'"
             return 0
@@ -598,7 +598,7 @@ case "${1:-}" in
                 arc="${STAGE_DIR}/${name}.tar.zst"
                 mkdir -p "$dst"
                 if [ -f "$arc" ] && [ -z "$(ls -A "$dst" 2>/dev/null || true)" ]; then
-                    zstd -dc -q "$arc" 2>/dev/null | tar -C "$dst" -xf - 2>/dev/null || true
+                    zstd -dc -q "$arc" 2>/dev/null \vert{} tar -C "$dst" -xf - 2>/dev/null || true
                 fi
             done
         fi
@@ -612,7 +612,7 @@ esac
 exit 0
 ```
 
-### 8\. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/usr/bin/ax-mode-cli`
+### 8. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/usr/bin/ax-mode-cli`
 
 ```sh
 #!/bin/sh
@@ -659,7 +659,7 @@ status_line() {
         dac_info="DAC: FC3 ready"
     fi
 
-    echo "  Status: ${share_info} | ${dac_info}"
+    echo "  Status: ${share_info} \vert{}${dac_info}"
 }
 
 # Desktop mode launches piccolo-ax-desktop directly with /userdata persistence
@@ -776,7 +776,7 @@ while true; do
 done
 ```
 
-### 9\. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/usr/bin/verify_ax_appliance.sh`
+### 9. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/usr/bin/verify_ax_appliance.sh`
 
 ```sh
 #!/usr/bin/env bash
@@ -867,4 +867,3 @@ else
     exit 1
 fi
 ```
-
