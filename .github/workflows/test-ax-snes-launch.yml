@@ -1,0 +1,49 @@
+name: Test ax-snes-launch.sh (Syntax, ShellCheck & No-Args Exit Code 2)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/ax-snes-launch.sh"
+      - "batocera-ax-external/package/genx-snes-ax/**"
+      - ".github/workflows/test-ax-snes-launch.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/ax-snes-launch.sh"
+      - "batocera-ax-external/package/genx-snes-ax/**"
+      - ".github/workflows/test-ax-snes-launch.yml"
+  workflow_dispatch:
+
+jobs:
+  test-ax-snes-launch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Piccolo-AX
+        uses: actions/checkout@v5
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends shellcheck
+
+      - name: Syntax, ShellCheck, and No-Argument Usage Check
+        run: |
+          set -euo pipefail
+          test -f scripts/ax-snes-launch.sh
+          chmod +x scripts/ax-snes-launch.sh
+          sh -n scripts/ax-snes-launch.sh
+          shellcheck -x scripts/ax-snes-launch.sh
+
+          set +e
+          /bin/bash scripts/ax-snes-launch.sh >/tmp/snes_usage.out 2>&1
+          rc=$?
+          set -e
+
+          echo "Exit code with no arguments: ${rc}"
+          test "${rc}" -eq 2
+          grep -q "Usage:" /tmp/snes_usage.out
+
+      - name: Clean Temporary Test Artifacts
+        if: always()
+        run: rm -f /tmp/snes_usage.out
