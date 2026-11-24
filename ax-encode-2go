@@ -2,17 +2,23 @@
 # ax-encode-2go — Piccolo-AX (i5-9600K QSV + GTX 980 Ti) 640x480 G350 Movie Encoder
 set -eu
 
-TARGET_FPS="60"
+FPS_MODE="auto"
+NORMALIZE_AUDIO="0"
+AUDIO_CODEC="aac"
 
 usage() {
-	echo "Usage: ax-encode-2go [--60fps|--30fps] <input_video> [output_video]" >&2
+	echo "Usage: ax-encode-2go [--auto-fps|--60fps|--30fps] [--normalize] [--flac|--aac] <input_video> [output_video]" >&2
 	exit 1
 }
 
 while [ "$#" -gt 0 ]; do
 	case "$1" in
-		--60fps) TARGET_FPS="60"; shift ;;
-		--30fps) TARGET_FPS="30"; shift ;;
+		--auto-fps) FPS_MODE="auto"; shift ;;
+		--60fps) FPS_MODE="60"; shift ;;
+		--30fps) FPS_MODE="30"; shift ;;
+		--normalize) NORMALIZE_AUDIO="1"; shift ;;
+		--flac) AUDIO_CODEC="flac"; shift ;;
+		--aac) AUDIO_CODEC="aac"; shift ;;
 		-h|--help) usage ;;
 		--) shift; break ;;
 		-*) echo "Unknown option: $1" >&2; usage ;;
@@ -28,25 +34,76 @@ INPUT="$1"
 	exit 1
 }
 
+detect_target_fps() {
+	if [ "$FPS_MODE" = "60" ] || [ "$FPS_MODE" = "30" ]; then
+		echo "$FPS_MODE"
+		return
+	fi
+
+	RATE_STR="$(ffprobe -v error -select_streams v:0 \
+		-show_entries stream=avg_frame_rate \
+		-of default=noprint_wrappers=1:nokey=1 "$INPUT" 2>/dev/null | head -n 1 || true)"
+
+	NUM="${RATE_STR%%/*}"
+	DEN="${RATE_STR##*/}"
+	case "$NUM" in
+		''|*[!0-9]*) NUM="0" ;;
+	esac
+	case "$DEN" in
+		''|0|*[!0-9]*) DEN="1" ;;
+	esac
+
+	if [ "$NUM" -gt $((30 * DEN)) ]; then
+		echo "60"
+	else
+		echo "30"
+	fi
+}
+
+TARGET_FPS="$(detect_target_fps)"
+GOP_SIZE="$TARGET_FPS"
+
 if [ "$#" -ge 2 ] && [ -n "$2" ]; then
 	OUTPUT="$2"
 else
 	BASE="${INPUT%.*}"
-	OUTPUT="${BASE}_g350_640x480_${TARGET_FPS}fps.mp4"
+	if [ "$AUDIO_CODEC" = "flac" ]; then
+		OUTPUT="${BASE}_g350_640x480_${TARGET_FPS}fps_flac.mkv"
+	else
+		OUTPUT="${BASE}_g350_640x480_${TARGET_FPS}fps.mp4"
+	fi
 fi
 
 mkdir -p "$(dirname "$OUTPUT")"
 
-# RK3326 / G350-safe H.264 parameters:
-# - Main profile + zero B-frames (-bf 0) for low-latency Cortex-A35 software decode at 60 fps
-# - GOP = TARGET_FPS (1-second keyframes) + VBV cap (3.5 Mbps) to prevent SD/bus spikes
-GOP_SIZE="$TARGET_FPS"
+if [ "$NORMALIZE_AUDIO" = "1" ]; then
+	AF_CHAIN="loudnorm=I=-16:TP=-1.5:LRA=11"
+else
+	AF_CHAIN=""
+fi
+
+if [ "$AUDIO_CODEC" = "flac" ]; then
+	if [ -n "$AF_CHAIN" ]; then
+		AUDIO_ARGS="-af ${AF_CHAIN} -c:a flac -ar 48000 -ac 2 -compression_level 8"
+	else
+		AUDIO_ARGS="-c:a flac -ar 48000 -ac 2 -compression_level 8"
+	fi
+	CONTAINER_ARGS=""
+else
+	if [ -n "$AF_CHAIN" ]; then
+		AUDIO_ARGS="-af ${AF_CHAIN} -c:a aac -ar 48000 -ac 2 -b:a 160k"
+	else
+		AUDIO_ARGS="-c:a aac -ar 48000 -ac 2 -b:a 160k"
+	fi
+	CONTAINER_ARGS="-movflags +faststart"
+fi
 
 # Core 5 (0x20) housekeeping/I/O plane:
 # - Intel QSV (i5-9600K iGPU) handles hardware decode/encode (h264_qsv)
-# - NVIDIA GTX 980 Ti (cuda) runs Lanczos scaling + semi-pro image optimization
-# - Audio outputs 48000 Hz stereo AAC for zero-resampling playback on Piccolo-2go (G350)
+# - NVIDIA GTX 980 Ti (cuda) runs Lanczos supersampling + IPS contrast/detail polish
+# - Main profile + zero B-frames (-bf 0) + VBV cap (3.5 Mbps) for zero-stutter RK3326 decode
 run_qsv_plus_nvidia() {
+	# shellcheck disable=SC2086
 	taskset -c 5 ffmpeg -y \
 		-init_hw_device qsv=qsv:/dev/dri/renderD128 \
 		-init_hw_device cuda=nv:0 \
@@ -54,24 +111,25 @@ run_qsv_plus_nvidia() {
 		-hwaccel qsv \
 		-hwaccel_output_format qsv \
 		-i "$INPUT" \
-		-vf "hwdownload,format=nv12,hwupload_cuda,scale_cuda=640:480:force_original_aspect_ratio=decrease:interp_algo=lanczos,hwdownload,format=nv12,hqdn3d=1.5:1.2:2.0:1.5,eq=contrast=1.04:brightness=0.01:gamma=0.98:saturation=1.05,unsharp=3:3:0.35:3:3:0.0,pad=640:480:(ow-iw)/2:(oh-ih)/2:black,fps=${TARGET_FPS},format=nv12,hwupload=extra_hw_frames=64" \
+		-vf "hwdownload,format=nv12,hwupload_cuda,scale_cuda=640:480:force_original_aspect_ratio=decrease:interp_algo=lanczos,hwdownload,format=nv12,hqdn3d=1.5:1.2:2.0:1.5,eq=contrast=1.04:brightness=0.01:gamma=0.98:saturation=1.05,unsharp=3:3:0.35:3:3:0.0,pad=640:480:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=${TARGET_FPS},format=nv12,hwupload=extra_hw_frames=64" \
 		-c:v h264_qsv -profile:v main -preset veryslow -global_quality 21 -bf 0 -g "$GOP_SIZE" -maxrate 3500k -bufsize 7000k \
-		-c:a aac -ar 48000 -ac 2 -b:a 160k \
-		-movflags +faststart \
+		$AUDIO_ARGS \
+		$CONTAINER_ARGS \
 		"$OUTPUT"
 }
 
 run_qsv_only() {
+	# shellcheck disable=SC2086
 	taskset -c 5 ffmpeg -y \
 		-init_hw_device qsv=qsv:/dev/dri/renderD128 \
 		-filter_hw_device qsv \
 		-hwaccel qsv \
 		-hwaccel_output_format qsv \
 		-i "$INPUT" \
-		-vf "vpp_qsv=w=640:h=480:scale_mode=2:denoise=15:detail=25,fps=${TARGET_FPS},format=nv12" \
+		-vf "vpp_qsv=w=640:h=480:scale_mode=2:denoise=15:detail=25,setsar=1,fps=${TARGET_FPS},format=nv12" \
 		-c:v h264_qsv -profile:v main -preset veryslow -global_quality 21 -bf 0 -g "$GOP_SIZE" -maxrate 3500k -bufsize 7000k \
-		-c:a aac -ar 48000 -ac 2 -b:a 160k \
-		-movflags +faststart \
+		$AUDIO_ARGS \
+		$CONTAINER_ARGS \
 		"$OUTPUT"
 }
 
@@ -80,4 +138,4 @@ if ! run_qsv_plus_nvidia; then
 	run_qsv_only
 fi
 
-echo "[ax-encode-2go] Encoded for G350 (640x480 @ ${TARGET_FPS}fps, Main/no-B-frames, 48kHz AAC): $OUTPUT"
+echo "[ax-encode-2go] Encoded (640x480 @ ${TARGET_FPS}fps, Main/no-B-frames, 48kHz ${AUDIO_CODEC}): $OUTPUT"
