@@ -1,4 +1,4 @@
-      # Piccolo-AX Architecture Topology & Reference Implementation
+# Piccolo-AX Architecture Topology & Reference Implementation
 
 ## AX Ecosystem: 9-Repository Topology & Lineage
 
