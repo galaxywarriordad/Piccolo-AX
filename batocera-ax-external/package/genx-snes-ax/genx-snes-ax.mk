@@ -11,7 +11,11 @@ GENX_SNES_AX_DEPENDENCIES = ax-sdk
 GENX_SNES_AX_CONF_OPTS = -DGENX_BUILD_SNES=ON
 
 define GENX_SNES_AX_INSTALL_TARGET_CMDS
-	$(INSTALL) -D -m 0755 $(@D)/genx-snes-ax $(TARGET_DIR)/usr/bin/genx-snes-ax
+	if [ -x "$(@D)/build/genx-snes-ax" ]; then \
+		$(INSTALL) -D -m 0755 $(@D)/build/genx-snes-ax $(TARGET_DIR)/usr/bin/genx-snes-ax; \
+	else \
+		$(INSTALL) -D -m 0755 $(@D)/genx-snes-ax $(TARGET_DIR)/usr/bin/genx-snes-ax; \
+	fi
 	$(INSTALL) -D -m 0755 $(@D)/scripts/ax-snes-launch.sh $(TARGET_DIR)/usr/bin/ax-snes-launch.sh
 endef
 
