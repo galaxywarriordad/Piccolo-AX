@@ -57,7 +57,7 @@ jobs:
       - name: Configure & Compile Piccolo-AX Image
         run: |
           cd buildroot
-          make BR2_EXTERNAL="${GITHUB_WORKSPACE}/Piccolo-AX/batocera-ax-external:${GITHUB_WORKSPACE}/piccolo-ax-desktop/buildroot" "${{ inputs.defconfig }}"
+          make BR2_EXTERNAL="${GITHUB_WORKSPACE}/Piccolo-AX/batocera-ax-external" "${{ inputs.defconfig }}"
           make -j"$(nproc)"
 
       - name: Upload Piccolo-AX Release Image
