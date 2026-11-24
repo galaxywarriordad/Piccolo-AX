@@ -4,13 +4,11 @@ on:
   push:
     branches: [main]
     paths:
-      - "scripts/ax-snes-launch.sh"
       - "batocera-ax-external/package/genx-snes-ax/**"
       - ".github/workflows/test-ax-snes-launch.yml"
   pull_request:
     branches: [main]
     paths:
-      - "scripts/ax-snes-launch.sh"
       - "batocera-ax-external/package/genx-snes-ax/**"
       - ".github/workflows/test-ax-snes-launch.yml"
   workflow_dispatch:
@@ -21,6 +19,14 @@ jobs:
     steps:
       - name: Checkout Piccolo-AX
         uses: actions/checkout@v5
+        with:
+          path: Piccolo-AX
+
+      - name: Checkout Generation-X-AX
+        uses: actions/checkout@v5
+        with:
+          repository: galaxywarriordad/Generation-X-AX
+          path: Generation-X-AX
 
       - name: Install shellcheck
         run: |
@@ -30,13 +36,14 @@ jobs:
       - name: Syntax, ShellCheck, and No-Argument Usage Check
         run: |
           set -euo pipefail
-          test -f scripts/ax-snes-launch.sh
-          chmod +x scripts/ax-snes-launch.sh
-          sh -n scripts/ax-snes-launch.sh
-          shellcheck -x scripts/ax-snes-launch.sh
+          LAUNCHER="Generation-X-AX/scripts/ax-snes-launch.sh"
+          test -f "${LAUNCHER}"
+          chmod +x "${LAUNCHER}"
+          sh -n "${LAUNCHER}"
+          shellcheck -x "${LAUNCHER}"
 
           set +e
-          /bin/bash scripts/ax-snes-launch.sh >/tmp/snes_usage.out 2>&1
+          /bin/bash "${LAUNCHER}" >/tmp/snes_usage.out 2>&1
           rc=$?
           set -e
 
