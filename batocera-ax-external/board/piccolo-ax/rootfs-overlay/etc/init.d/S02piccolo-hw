@@ -37,13 +37,16 @@ EOF
     # Stage RAM tmpfs shader & PGO directories
     mkdir -p /dev/shm/emu_cache /dev/shm/nv_cache /dev/shm/pgo
 
-    # Only prepare /userdata rom mountpoints if SHARE / userdata is mounted, then mount SwitchHDD async on Core 5
+    # Only prepare /userdata rom/save mountpoints if SHARE / userdata is mounted, then mount SwitchHDD async on Core 5
     if grep -qs "[[:space:]]/userdata[[:space:]]" /proc/mounts; then
-        mkdir -p /userdata/roms/switch /userdata/roms/wiiu /userdata/roms/n64
+        mkdir -p /userdata/roms/switch /userdata/roms/wiiu /userdata/roms/n64 /userdata/roms/snes /userdata/saves/snes
         taskset -c 5 sh -c 'mount -L SwitchHDD -o ro,noatime /userdata/roms/switch 2>/dev/null || true' &
     fi
     ;;
   stop)
+    if [ -x /etc/init.d/K01piccolo-sync ]; then
+        /etc/init.d/K01piccolo-sync save >/dev/null 2>&1 || true
+    fi
     ;;
 esac
 exit 0
