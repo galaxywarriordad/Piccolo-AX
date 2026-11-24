@@ -25,8 +25,10 @@ fi
 
 mkdir -p "$(dirname "$OUTPUT")"
 
-# Semi-pro image polish + 640x480 aspect-locked framing (30 fps, yuv420p/nv12, 48kHz AAC)
-# Runs on Core 5 (taskset -c 5) using Intel QSV + NVIDIA GTX 980 Ti (with safe fallback)
+# Core 5 (0x20) housekeeping/I/O plane:
+# - Intel QSV (i5-9600K iGPU) handles hardware decode/encode (h264_qsv)
+# - NVIDIA GTX 980 Ti (cuda) runs image optimization + 640x480 aspect-locked framing
+# - Audio outputs 48000 Hz stereo AAC for zero-resampling playback on Piccolo-2go (G350)
 run_qsv_plus_nvidia() {
 	taskset -c 5 ffmpeg -y \
 		-init_hw_device qsv=qsv:/dev/dri/renderD128 \
@@ -35,7 +37,7 @@ run_qsv_plus_nvidia() {
 		-hwaccel qsv \
 		-hwaccel_output_format qsv \
 		-i "$INPUT" \
-		-vf "hwdownload,format=nv12,hwupload_cuda,scale_cuda=640:480:force_original_aspect_ratio=decrease:interp_algo=lanczos,hwdownload,format=nv12,pad=640:480:(ow-iw)/2:(oh-ih)/2:black,hqdn3d=1.5:1.2:2.0:1.5,eq=contrast=1.04:brightness=0.01:gamma=0.98:saturation=1.05,unsharp=3:3:0.35:3:3:0.0,fps=30,format=nv12,hwupload=extra_hw_frames=64" \
+		-vf "hwdownload,format=nv12,hwupload_cuda,scale_cuda=640:480:force_original_aspect_ratio=decrease:interp_algo=lanczos,hwdownload,format=nv12,hqdn3d=1.5:1.2:2.0:1.5,eq=contrast=1.04:brightness=0.01:gamma=0.98:saturation=1.05,unsharp=3:3:0.35:3:3:0.0,pad=640:480:(ow-iw)/2:(oh-ih)/2:black,fps=30,format=nv12,hwupload=extra_hw_frames=64" \
 		-c:v h264_qsv -preset veryslow -global_quality 21 -look_ahead 1 \
 		-c:a aac -ar 48000 -ac 2 -b:a 160k \
 		-movflags +faststart \
@@ -57,7 +59,7 @@ run_qsv_only() {
 }
 
 if ! run_qsv_plus_nvidia; then
-	echo "[ax-encode-2go] CUDA bridge unavailable or failed; falling back to QSV pipeline on Core 5..." >&2
+	echo "[ax-encode-2go] CUDA bridge unavailable or failed; falling back to QSV-only pipeline on Core 5..." >&2
 	run_qsv_only
 fi
 
