@@ -1,0 +1,64 @@
+#!/bin/sh
+# ax-encode-2go — Piccolo-AX (i5-9600K QSV + GTX 980 Ti) 640x480 G350 Movie Encoder
+set -eu
+
+usage() {
+	echo "Usage: ax-encode-2go <input_video> [output_video]" >&2
+	exit 1
+}
+
+[ "$#" -ge 1 ] || usage
+[ "$1" != "-h" ] && [ "$1" != "--help" ] || usage
+
+INPUT="$1"
+[ -f "$INPUT" ] || {
+	echo "Error: input file not found: $INPUT" >&2
+	exit 1
+}
+
+if [ "$#" -ge 2 ] && [ -n "$2" ]; then
+	OUTPUT="$2"
+else
+	BASE="${INPUT%.*}"
+	OUTPUT="${BASE}_g350_640x480.mp4"
+fi
+
+mkdir -p "$(dirname "$OUTPUT")"
+
+# Semi-pro image polish + 640x480 aspect-locked framing (30 fps, yuv420p/nv12, 48kHz AAC)
+# Runs on Core 5 (taskset -c 5) using Intel QSV + NVIDIA GTX 980 Ti (with safe fallback)
+run_qsv_plus_nvidia() {
+	taskset -c 5 ffmpeg -y \
+		-init_hw_device qsv=qsv:/dev/dri/renderD128 \
+		-init_hw_device cuda=nv:0 \
+		-filter_hw_device qsv \
+		-hwaccel qsv \
+		-hwaccel_output_format qsv \
+		-i "$INPUT" \
+		-vf "hwdownload,format=nv12,hwupload_cuda,scale_cuda=640:480:force_original_aspect_ratio=decrease:interp_algo=lanczos,hwdownload,format=nv12,pad=640:480:(ow-iw)/2:(oh-ih)/2:black,hqdn3d=1.5:1.2:2.0:1.5,eq=contrast=1.04:brightness=0.01:gamma=0.98:saturation=1.05,unsharp=3:3:0.35:3:3:0.0,fps=30,format=nv12,hwupload=extra_hw_frames=64" \
+		-c:v h264_qsv -preset veryslow -global_quality 21 -look_ahead 1 \
+		-c:a aac -ar 48000 -ac 2 -b:a 160k \
+		-movflags +faststart \
+		"$OUTPUT"
+}
+
+run_qsv_only() {
+	taskset -c 5 ffmpeg -y \
+		-init_hw_device qsv=qsv:/dev/dri/renderD128 \
+		-filter_hw_device qsv \
+		-hwaccel qsv \
+		-hwaccel_output_format qsv \
+		-i "$INPUT" \
+		-vf "vpp_qsv=w=640:h=480:scale_mode=2:denoise=15:detail=25,fps=30,format=nv12" \
+		-c:v h264_qsv -preset veryslow -global_quality 21 -look_ahead 1 \
+		-c:a aac -ar 48000 -ac 2 -b:a 160k \
+		-movflags +faststart \
+		"$OUTPUT"
+}
+
+if ! run_qsv_plus_nvidia; then
+	echo "[ax-encode-2go] CUDA bridge unavailable or failed; falling back to QSV pipeline on Core 5..." >&2
+	run_qsv_only
+fi
+
+echo "[ax-encode-2go] Encoded for G350 (640x480 @ 30fps, 48kHz AAC): $OUTPUT"
