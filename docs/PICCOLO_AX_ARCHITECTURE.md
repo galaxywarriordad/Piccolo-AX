@@ -1,78 +1,84 @@
-# Piccolo-AX Architecture Topology & Reference Implementation
+      # Piccolo-AX Architecture Topology & Reference Implementation
 
-## 🌐 AX Ecosystem: Multi-Repository Topology & Lineage
+## AX Ecosystem: 9-Repository Topology & Lineage
 
-The **AX Project** separates shared low-level C++20 silicon abstractions (`ax-sdk`) from platform-, emulator-, and workbench-specific repositories so upstream rebases stay clean while hardware isolation logic remains unified across Windows 10/11 and bare-metal Linux.
+The **AX Project** separates shared low-level C++20 silicon abstractions (`ax-sdk`) from platform-, emulator-, and workbench-specific repositories so upstream rebases stay clean while hardware isolation logic remains unified across Windows 10/11, bare-metal `x86_64` Linux, and `aarch64` handhelds.
 
-```text
-                    +-------------------------------------------------------+
-                    |                        ax-sdk                         |
-                    |      (https://github.com/galaxywarriordad/ax-sdk)     |
-                    |  Shared C++20 Silicon Core, Dynamic SMT/CCX Topology, |
-                    |  Platform Shims, Telemetry Schemas & Master Specs     |
-                    +-------------------------------------------------------+
-                       /            |               |              \
-       CMake FetchContent   CMake FetchContent  CMake FetchContent  FetchContent / SHM
-                     /              |               |                \
-                    v               v               v                 v
+```
+                      +-------------------------------------------------------+
+                      |                   ax-sdk (v1_36_2)                    |
+                      |   (https://github.com/galaxywarriordad/ax-sdk)        |
+                      | Shared C++20 Silicon Core, Dynamic SMT/CCX & 1:2:1    |
+                      | Topology, Platform Shims, Telemetry & Master Specs    |
+                      +-------------------------------------------------------+
+                            /             /               \             \
+              FetchContent / FetchContent/                 \ FetchContent\ BR2_EXTERNAL
+                          v             v                   v             v
 +-----------------------+ +-------------------+ +------------------+ +-----------------------+
-| Eden-Espresso-Wave-AX | |    Piccolo-AX     | |  Cemu-Latte-AX   | |   Generation-X-AX     |
-| (Forgejo — Switch)    | | (GitHub — OS)     | | (GitHub — Wii U) | | (GitHub — 7 Classics) |
-| Win10/11 Master,      | | < 512 MB toram    | | Wii U / Latte    | | RMG, BlastEm, OutRun, |
-| LLVM 23 PGO, QSV      | | 6.12-rt Appliance | | Powered by ax    | | EDuke32, Frontier,    |
-+-----------------------+ +-------------------+ +------------------+ | Flycast & Hatari      |
-                             ^             ^                         +-----------------------+
-                             |             | Buildroot Package (flac-ax)
-                             |   +---------------------------------------+
-                             |   |                FLAC_AX                |
-                             |   |   (GitHub — A/V Studio & ESS Audio)   |
-                             |   | flac_ax (S32_LE) + ax_av_studio (HUD) |
-                             |   +---------------------------------------+
-                             | Optional BR2_EXTERNAL Layer
-                   +-------------------+
-                   | piccolo-ax-desktop|
-                   | (GitHub — <35 MB) |
-                   | C/C++ Workbench   |
-                   +-------------------+
+| Eden-Espresso-Wave-AX | | Cemu-Latte-AX     | | Amiberry-AX      | | Generation-X-AX       |
+| (Forgejo — Switch)    | | (GitHub — Wii U)  | | (GitHub — Amiga) | | (GitHub — 7 Classics) |
+| Win10/11 Master,      | | Wii U / Latte     | | 500/1200/CD32    | | RMG, BlastEm, OutRun, |
+| LLVM 23 PGO, QSV      | | Powered by ax     | | Powered by ax    | | EDuke32, Frontier,    |
+|                       | |                   | |                  | | Flycast & Hatari      |
++-----------------------+ +-------------------+ +------------------+ +-----------------------+
+                                               |                              
+                       +-----------------------+-----------------------+
+                       |                       |                       |
+                       v                       v                       v
+        +-----------------------+ +-------------------+ +---------------------------------------+
+        | Piccolo-2go           | | Piccolo-AX        | | FLAC_AX                               |
+        | (GitHub — ARM64 OS)   | | (GitHub — x86 OS) | | (GitHub — A/V Studio & ESS Audio)     |
+        | RK3326 1:2:1 Handheld | | < 512 MB toram    | | flac_ax (S32_LE) + ax_av_studio (HUD) |
+        | BATLEXP G350 & R36S   | | 6.12-rt Appliance | +---------------------------------------+
+        +-----------------------+ +---------+---------+
+                                            | Optional BR2_EXTERNAL Layer
+                                            v
+                                  +-------------------+
+                                  |piccolo-ax-desktop |
+                                  | (GitHub — <42 MB) |
+                                  | C/C++ Workbench   |
+                                  +-------------------+
 ```
 
-### Repository Breakdown & Lineage
+### Repository Breakdown & Lineage (All 9 Repositories)
 
 | Repository | Host & Canonical URL | Primary Role & Lineage |
-| :--- | :--- | :--- |
-| **`ax-sdk`** | **GitHub:** `galaxywarriordad/ax-sdk` | Shared, zero-dependency C++20 silicon library (`libax_core` / `ax::core`), dynamic Intel SMT / AMD CCX topology resolver, Win32/Linux platform shims, and cross-project master specs. |
+| :---- | :---- | :---- |
+| **`ax-sdk`** | **GitHub:** `galaxywarriordad/ax-sdk` | Shared, zero-dependency C++20 silicon library (`libax_core` / `ax::core`, `v1_36_2`), dynamic Intel SMT / AMD CCX / `RK3326` `1:2:1` topology resolver, Win32/Linux platform shims, and cross-project master specs. |
 | **`Eden-Espresso-Wave-AX`** | **Forgejo:** `galaxywarriordad/Eden-Espresso-Wave-AX` | **Windows 10/11 Switch Engine Master** — Direct fork of upstream Eden hosted on Forgejo for frictionless PR cherry-picks; features LLVM `clang-cl` 23+ 3-stage PGO, FlexASIO/WASAPI Exclusive audio, Intel QSV offload, and Maxwell GM200 VRAM shields. |
 | **`Piccolo-AX`** | **GitHub:** `galaxywarriordad/Piccolo-AX` | **Batocera Linux Branch of `Eden-Espresso-Wave-AX`** — Adapts the Espresso Wave `[AX]` engine for bare-metal Linux (`Linux 6.12-rt`, direct ALSA `SCHED_FIFO`, `iHD` VA-API `dma_buf`) and packages all `[AX]` engines and studios via `batocera-ax-external/` into a `< 512 MB` `toram` EROFS USB 3.0 console appliance. |
+| **`Piccolo-2go`** | **GitHub:** `galaxywarriordad/Piccolo-2go` | **Deterministic `aarch64` Buildroot Handheld OS** — `< 140 MB` `zstd` SquashFS for **BATLEXP G350** & **R36S** (`RK3326`, `1:2:1` isolation, `1024 MB LZ4` ZRAM, `Panfrost` KMS/DRM, dual SanDisk `SDR50` guard, and **HiBy FC3 `1.3 Vrms`** OTG audio). |
 | **`Generation-X-AX`** | **GitHub:** `galaxywarriordad/Generation-X-AX` | **Unified Classic Engines `[AX]` Suite** — Consolidates 7 classic 1985–1998 engines (`RMG` N64, `BlastEm` Mega Drive, `Cannonball` OutRun, `EDuke32`, `Frontier: Elite II`, `Flycast` Dreamcast/NAOMI, and `Hatari` Atari ST) behind `ax_retro_bridge` (`ax::core`). |
 | **`Cemu-Latte-AX`** | **GitHub:** `galaxywarriordad/Cemu-Latte-AX` | **Nintendo Wii U (Latte GPU) AX Fork** — Integrates `ax::core` for deterministic physical-core isolation, MMCSS/ALSA audio prioritization, and hardware IRQ/VRAM discipline across Windows 10/11 and `Piccolo-AX`. |
-| **`piccolo-ax-desktop`** | **GitHub:** `galaxywarriordad/piccolo-ax-desktop` | **Optional `< 35 MB` C/C++ Desktop Workbench** — Pluggable `BR2_EXTERNAL` overlay providing `LXQt`/`XFCE`, `Falkon`, `GrafX2`, `LibreSprite`, `mtPaint`, `AzPainter`, `GHex`, and `CPU-X` with `SHARE` persistence. |
+| **`Amiberry-AX`** | **GitHub:** `galaxywarriordad/Amiberry-AX` | **Commodore Amiga 500 / 1200 / CD32 AX Fork** — Integrates `ax::core` (`v1_36_2`) for cycle-consistent `50 Hz` PAL raster timing, `HugeTLB` fastmem, and Paula DMA audio isolation. |
+| **`piccolo-ax-desktop`** | **GitHub:** `galaxywarriordad/piccolo-ax-desktop` | **Optional `< 42 MB` Tier A C/C++ Desktop Workbench** — Pluggable `BR2_EXTERNAL` overlay providing `LXQt`/`XFCE`, `Falkon`, `GrafX2`, `LibreSprite`, `mtPaint`, `AzPainter`, `GHex`, and `CPU-X` with `SHARE` persistence. |
 | **`FLAC_AX`** | **GitHub:** `galaxywarriordad/FLAC_AX` | **Deterministic `[AX]` Audio/Visual Studio & ESS Sabre Appliance** — Combines bit-perfect `44.1–384 kHz` `S32_LE` playback (`flac_ax`) with a live `2.00 ms` 16-voice polyphonic synthesizer, Akai MPK Mini MK3 ALSA RawMIDI controller, and VBlank OpenGL FFT/oscilloscope HUD (`ax_av_studio`). |
 
 ### Cross-Repository Dependency & Merge Flow
 
-* **Shared Silicon Core (`ax-sdk`):** `Eden-Espresso-Wave-AX`, `Piccolo-AX`, `Cemu-Latte-AX`, `Generation-X-AX`, and `FLAC_AX` all consume `ax-sdk` (`v1.36.2`) as a pinned CMake dependency (`ax::core`), inheriting identical core-pinning, `LockFreeStereoRing` audio buffers, and `/dev/shm/ax_telemetry` jitter counters without duplicating C++20 code.
-* **Unified Appliance Assembly (`Piccolo-AX`):** `batocera-ax-external/` pulls `Eden-Espresso-Wave-AX`, `Cemu-Latte-AX`, all `Generation-X-AX` engine targets, and `FLAC_AX` (`flac_ax` + `ax_av_studio`, coordinated via `/run/lock/ax-dac.lock` DAC handoff) into a single immutable `rootfs.erofs` image—with optional `piccolo-ax-desktop` workbench layering enabled via `BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH`.
+* **Shared Silicon Core (`ax-sdk`):** `Eden-Espresso-Wave-AX`, `Piccolo-AX`, `Piccolo-2go`, `Cemu-Latte-AX`, `Amiberry-AX`, `Generation-X-AX`, and `FLAC_AX` all consume `ax-sdk` (`v1.36.2`) as a pinned CMake dependency (`ax::core`), inheriting identical core-pinning, `LockFreeStereoRing` audio buffers, and `/dev/shm/ax_telemetry` jitter counters without duplicating C++20 code.  
+* **Unified Appliance Assembly (`Piccolo-AX`):** `batocera-ax-external/` pulls `Eden-Espresso-Wave-AX`, `Cemu-Latte-AX`, `Amiberry-AX`, all `Generation-X-AX` engine targets, and `FLAC_AX` (`flac_ax` \+ `ax_av_studio`, coordinated via `/run/lock/ax-dac.lock` DAC handoff) into a single immutable `rootfs.erofs` image—with optional `piccolo-ax-desktop` workbench layering enabled via `BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH`.
 
 ---
 
-## ⚙️ Piccolo-AX System & Storage Architecture
+## Piccolo-AX System & Storage Architecture
 
 ### Core Architectural Constraints & Design Principles
 
-* **Immutable `toram` EROFS Rootfs (`<= 512 MiB` / `524288 KB`):** Packed with `mkfs.erofs -zlz4hc,9 -T0 --force-uid=0 --force-gid=0` so the read-only appliance rootfs fits comfortably in RAM with zero runtime flash wear.
-* **Journal-Free `ext4` `SHARE` Partition (`-O ^has_journal`):** Mounted on `/userdata` to eliminate ext4 journal write amplification on Samsung FIT Plus (`64 GB` `MUF-64AB/APC` and `128 GB`) USB flash storage.
-* **First-Boot Dynamic Expansion (`ax-grow-share.sh`):** Keeps the build-time image compact (`4096 MiB` `BATOCERA` FAT32 + `2048 MiB` default `SHARE` ext4) so a single flash image works across both `64 GB` and `128 GB` drives, then relocates the GPT backup header (`sgdisk -e`), grows partition 2 to `100%`, and expands the `ext4` filesystem (`resize2fs`) on first boot.
-* **CPU Core Isolation & IRQ Pinning:**
-  * **Cores `0–4`:** Isolated domain (`isolcpus=managed_irq,domain,0-4`, `nohz_full=0-4`, `rcu_nocbs=0-4`, and cgroup v2 `eden.slice` `cpuset.cpus=0-4`), with Core `0` (`0x01`) hosting low-latency USB DAC / xHCI MSI IRQs and real-time audio (`SCHED_FIFO` priority `80`) and Core `1` (`0x02`) hosting NVIDIA GPU (`GTX 980 Ti` / `580.*` legacy branch) MSI IRQs.
-  * **Core `5` (`0x20`):** Quarantined target for unbound kernel workqueues, default SMP IRQ affinity, `512 MB` LZ4 `zram0` swap (`swapon -p 100`), and asynchronous `SwitchHDD` mounting.
-* **RAM-Resident Caches & Atomic Exit Persistence (`K01piccolo-sync`):** Emulator caches, PGO profiles, and NVIDIA caches stage in `/dev/shm/emu_cache`, `/dev/shm/pgo`, and `/dev/shm/nv_cache` during runtime and flush atomically (`.tmp.$$` -> `.tar.zst`) to `/userdata/system/ax-sync/` on shutdown/stop.
+* **Immutable `toram` EROFS Rootfs (`<= 512 MiB` / `524288 KB`):** Packed with `mkfs.erofs -zlz4hc,9 -T0 --force-uid=0 --force-gid=0` so the read-only appliance rootfs fits comfortably in RAM with zero runtime flash wear.  
+* **Journal-Free `ext4` `SHARE` Partition (`-O ^has_journal`):** Mounted on `/userdata` to eliminate ext4 journal write amplification on Samsung FIT Plus (`64 GB` `MUF-64AB/APC` and `128 GB`) USB flash storage.  
+* **First-Boot Dynamic Expansion (`ax-grow-share.sh`):** Keeps the build-time image compact (`4096 MiB` `BATOCERA` FAT32 \+ `2048 MiB` default `SHARE` ext4) so a single flash image works across both `64 GB` and `128 GB` drives, then relocates the GPT backup header (`sgdisk -e`), grows partition 2 to `100%`, and expands the `ext4` filesystem (`resize2fs`) on first boot.  
+* **CPU Core Isolation & IRQ Pinning:**  
+  * **Cores `0–4`:** Isolated domain (`isolcpus=managed_irq,domain,0-4`, `nohz_full=0-4`, `rcu_nocbs=0-4`, and cgroup v2 `eden.slice` `cpuset.cpus=0-4`), with Core `0` (`0x01`) hosting low-latency USB DAC / xHCI MSI IRQs and real-time audio (`SCHED_FIFO` priority `80`) and Core `1` (`0x02`) hosting NVIDIA GPU (`GTX 980 Ti` / `580.*` legacy branch) MSI IRQs.  
+  * **Core `5` (`0x20`):** Quarantined target for unbound kernel workqueues, default SMP IRQ affinity, `512 MB` LZ4 `zram0` swap (`swapon -p 100`), and asynchronous `SwitchHDD` mounting.  
+* **RAM-Resident Caches & Atomic Exit Persistence (`K01piccolo-sync`):** Emulator caches, PGO profiles, and NVIDIA caches stage in `/dev/shm/emu_cache`, `/dev/shm/pgo`, and `/dev/shm/nv_cache` during runtime and flush atomically (`.tmp.$$` \-\> `.tar.zst`) to `/userdata/system/ax-sync/` on shutdown/stop.  
 * **Exclusive DAC Locking (`/run/lock/ax-dac.lock`):** Serializes real-time access to `hw:CARD=FC3,DEV=0` (HiBy FC3 / ESS DAC) via `flock -n` in `ax-mode-cli` across `audio` (`flac_ax`, `ax_av_studio`) and `upscaler` (`ax_video_upscaler`) modes.
 
 ---
 
-## 📜 Reference Code & Configuration Suite
+## Reference Code & Configuration Suite
 
-### 1. `batocera-ax-external/board/piccolo-ax/post-build.sh`
+### 1\. `batocera-ax-external/board/piccolo-ax/post-build.sh`
 
 ```sh
 #!/usr/bin/env bash
@@ -83,26 +89,26 @@ DESKTOP_REPO="${BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH:-}"
 DESKTOP_ENABLED=0
 
 if [ -n "${DESKTOP_REPO}" ] && [ -d "${DESKTOP_REPO}" ]; then
-    if [ -n "${BR2_CONFIG:-}" ] && [ -f "${BR2_CONFIG}" ]; then
-        if grep -q '^BR2_PACKAGE_PICCOLO_AX_DESKTOP=y$' "${BR2_CONFIG}"; then
-            DESKTOP_ENABLED=1
-        fi
-    else
-        DESKTOP_ENABLED=1
+  if [ -n "${BR2_CONFIG:-}" ] && [ -f "${BR2_CONFIG}" ]; then
+    if grep -q '^BR2_PACKAGE_PICCOLO_AX_DESKTOP=y$' "${BR2_CONFIG}"; then
+      DESKTOP_ENABLED=1
     fi
+  else
+    DESKTOP_ENABLED=1
+  fi
 fi
 
 echo "[Piccolo-AX] Pruning unused GPU compute, LLVM, audio, and desktop bloat..."
 
 # 1. Strip unused NVIDIA compute/AI/encoding blobs (~200+ MB)
-rm -f "${TARGET_DIR}/usr/lib/libcuda.so" \
-      "${TARGET_DIR}/usr/lib/libnvidia-ptxjitcompiler.so" \
-      "${TARGET_DIR}/usr/lib/libnvidia-nvvm.so" \
-      "${TARGET_DIR}/usr/lib/libnvidia-opencl.so" \
-      "${TARGET_DIR}/usr/lib/libnvidia-optix.so" \
-      "${TARGET_DIR}/usr/lib/libnvidia-encode.so" \
-      "${TARGET_DIR}/usr/lib/libnvidia-fbc.so" \
-      "${TARGET_DIR}/usr/lib/libnvidia-ml.so"
+rm -f "${TARGET_DIR}/usr/lib/libcuda.so"* \
+      "${TARGET_DIR}/usr/lib/libnvidia-ptxjitcompiler.so"* \
+      "${TARGET_DIR}/usr/lib/libnvidia-nvvm.so"* \
+      "${TARGET_DIR}/usr/lib/libnvidia-opencl.so"* \
+      "${TARGET_DIR}/usr/lib/libnvidia-optix.so"* \
+      "${TARGET_DIR}/usr/lib/libnvidia-encode.so"* \
+      "${TARGET_DIR}/usr/lib/libnvidia-fbc.so"* \
+      "${TARGET_DIR}/usr/lib/libnvidia-ml.so"*
 
 # 2. Strip Mesa Gallium software rasterizers & target LLVM runtime (~100+ MB)
 rm -f "${TARGET_DIR}/usr/lib/libLLVM"*.so* \
@@ -125,20 +131,20 @@ rm -rf "${TARGET_DIR}/usr/bin/pipewire" \
        "${TARGET_DIR}/usr/sbin/rngd"
 
 if [ "${DESKTOP_ENABLED}" -eq 0 ]; then
-    rm -rf "${TARGET_DIR}/usr/bin/openbox"*
+  rm -rf "${TARGET_DIR}/usr/bin/openbox"*
 else
-    echo "[Piccolo-AX] Installing piccolo-ax-desktop workbench launchers..."
-    install -d -m 0755 "${TARGET_DIR}/etc/profile.d" "${TARGET_DIR}/usr/local/bin"
-    install -m 0644 "${DESKTOP_REPO}/overlays/common/etc/profile.d/ax-desktop-xdg.sh" \
-        "${TARGET_DIR}/etc/profile.d/ax-desktop-xdg.sh"
-    install -m 0755 "${DESKTOP_REPO}/scripts/launch-desktop.sh" \
-        "${TARGET_DIR}/usr/local/bin/launch-desktop.sh"
-    install -m 0755 "${DESKTOP_REPO}/scripts/launch-falkon.sh" \
-        "${TARGET_DIR}/usr/local/bin/launch-falkon.sh"
-    install -m 0755 "${DESKTOP_REPO}/scripts/stage-share-apps.sh" \
-        "${TARGET_DIR}/usr/local/bin/stage-share-apps.sh"
-    install -m 0755 "${DESKTOP_REPO}/scripts/launch-mtpaint.sh" \
-        "${TARGET_DIR}/usr/local/bin/mtpaint"
+  echo "[Piccolo-AX] Installing piccolo-ax-desktop workbench launchers..."
+  install -d -m 0755 "${TARGET_DIR}/etc/profile.d" "${TARGET_DIR}/usr/local/bin"
+  install -m 0644 "${DESKTOP_REPO}/overlays/common/etc/profile.d/ax-desktop-xdg.sh" \
+    "${TARGET_DIR}/etc/profile.d/ax-desktop-xdg.sh"
+  install -m 0755 "${DESKTOP_REPO}/scripts/launch-desktop.sh" \
+    "${TARGET_DIR}/usr/local/bin/launch-desktop.sh"
+  install -m 0755 "${DESKTOP_REPO}/scripts/launch-falkon.sh" \
+    "${TARGET_DIR}/usr/local/bin/launch-falkon.sh"
+  install -m 0755 "${DESKTOP_REPO}/scripts/stage-share-apps.sh" \
+    "${TARGET_DIR}/usr/local/bin/stage-share-apps.sh"
+  install -m 0755 "${DESKTOP_REPO}/scripts/launch-mtpaint.sh" \
+    "${TARGET_DIR}/usr/local/bin/mtpaint"
 fi
 
 # 4. Ensure init hooks & scripts are executable
@@ -150,7 +156,7 @@ chmod +x "${TARGET_DIR}/etc/init.d/S01piccolo-isolate" \
          "${TARGET_DIR}/usr/bin/verify_ax_appliance.sh" 2>/dev/null || true
 ```
 
-### 2. `batocera-ax-external/board/piccolo-ax/post-image.sh`
+### 2\. `batocera-ax-external/board/piccolo-ax/post-image.sh`
 
 ```sh
 #!/usr/bin/env bash
@@ -173,37 +179,37 @@ BOOT_PART_MIB=4096
 SHARE_PART_MIB="${SHARE_PART_MIB:-2048}"
 
 case "${FIT_PROFILE}" in
-    64g|64GB|64)
-        DISK_IMG="${BINARIES_DIR}/piccolo-ax-fit64-x86_64.img"
-        ;;
-    128g|128GB|128)
-        DISK_IMG="${BINARIES_DIR}/piccolo-ax-fit128-x86_64.img"
-        ;;
-    universal|*)
-        DISK_IMG="${BINARIES_DIR}/piccolo-ax-fit-x86_64.img"
-        ;;
+  64g|64GB|64)
+    DISK_IMG="${BINARIES_DIR}/piccolo-ax-fit64-x86_64.img"
+    ;;
+  128g|128GB|128)
+    DISK_IMG="${BINARIES_DIR}/piccolo-ax-fit128-x86_64.img"
+    ;;
+  universal|*)
+    DISK_IMG="${BINARIES_DIR}/piccolo-ax-fit-x86_64.img"
+    ;;
 esac
 
 for cmd in mkfs.erofs mkfs.vfat mkfs.ext4 mcopy mmd parted truncate; do
-    if ! command -v "$cmd" >/dev/null 2>&1; then
-        echo "ERROR: Required host tool '$cmd' not found in PATH."
-        exit 1
-    fi
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "ERROR: Required host tool '$cmd' not found in PATH."
+    exit 1
+  fi
 done
 
 if [ ! -d "${TARGET_DIR}" ]; then
-    echo "ERROR: Target rootfs directory '${TARGET_DIR}' does not exist."
-    exit 1
+  echo "ERROR: Target rootfs directory '${TARGET_DIR}' does not exist."
+  exit 1
 fi
 
 if [ ! -f "${BOARD_DIR}/limine.conf" ]; then
-    echo "ERROR: Missing required bootloader config '${BOARD_DIR}/limine.conf'."
-    exit 1
+  echo "ERROR: Missing required bootloader config '${BOARD_DIR}/limine.conf'."
+  exit 1
 fi
 
 # Rotate prior EROFS image for A/B fallback
 if [ -f "${EROFS_OUT}" ]; then
-    cp -f "${EROFS_OUT}" "${EROFS_PREV}"
+  cp -f "${EROFS_OUT}" "${EROFS_PREV}"
 fi
 
 echo "[Piccolo-AX] Packing EROFS (lz4hc,9) rootfs image..."
@@ -213,9 +219,9 @@ mkfs.erofs -zlz4hc,9 -T0 --force-uid=0 --force-gid=0 "${EROFS_OUT}" "${TARGET_DI
 ACTUAL_KB=$(du -k "${EROFS_OUT}" | cut -f1)
 echo "[Piccolo-AX] rootfs.erofs size: ${ACTUAL_KB} KB / ${MAX_EROFS_KB} KB budget"
 if [ "${ACTUAL_KB}" -gt "${MAX_EROFS_KB}" ]; then
-    echo "ERROR: rootfs.erofs (${ACTUAL_KB} KB) exceeds 512 MB toram budget!"
-    du -ah "${TARGET_DIR}" | sort -rh | head -n 15
-    exit 1
+  echo "ERROR: rootfs.erofs (${ACTUAL_KB} KB) exceeds 512 MB toram budget!"
+  du -ah "${TARGET_DIR}" | sort -rh | head -n 15
+  exit 1
 fi
 
 echo "[Piccolo-AX] Building ${BOOT_PART_MIB} MiB FAT32 (BATOCERA) image..."
@@ -250,15 +256,15 @@ dd if="${BOOT_IMG}" of="${DISK_IMG}" bs=1M seek=1 conv=notrunc status=none
 dd if="${SHARE_IMG}" of="${DISK_IMG}" bs=1M seek="$((1 + BOOT_PART_MIB))" conv=notrunc status=none
 
 if command -v limine >/dev/null 2>&1 && [ -f "${BINARIES_DIR}/limine-bios.sys" ]; then
-    limine bios-install "${DISK_IMG}" >/dev/null 2>&1 || true
+  limine bios-install "${DISK_IMG}" >/dev/null 2>&1 || true
 fi
 
 echo "[Piccolo-AX] Built ${DISK_IMG} (profile=${FIT_PROFILE}, SHARE=${SHARE_PART_MIB} MiB)."
 ```
 
-### 3. `batocera-ax-external/board/piccolo-ax/limine.conf`
+### 3\. `batocera-ax-external/board/piccolo-ax/limine.conf`
 
-```text
+```
 timeout: 3
 default_entry: 3
 remember_last_entry: yes
@@ -294,7 +300,7 @@ remember_last_entry: yes
     cmdline: root=/dev/ram0 toram isolcpus=managed_irq,domain,0-4 nohz_full=0-4 rcu_nocbs=0-4 default_hugepagesz=1G hugepagesz=1G hugepages=6 hugepagesz=2M hugepages=1024 processor.max_cstate=0 skew_tick=1 pcie_aspm=off mitigations=off usbcore.autosuspend=-1 usbhid.jspoll=1 ax.mode=retro ax.dac_lock=/run/lock/ax-dac.lock piccolo.rootfs=rootfs.erofs.prev
 ```
 
-### 4. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/usr/bin/ax-grow-share.sh`
+### 4\. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/usr/bin/ax-grow-share.sh`
 
 ```sh
 #!/bin/sh
@@ -306,108 +312,108 @@ LABEL_NAME="SHARE"
 MIN_FREE_MIB=64
 
 log_info() {
-    echo "[Piccolo-AX share-grow] $*"
+  echo "[Piccolo-AX share-grow] $*"
 }
 
 log_warn() {
-    echo "[Piccolo-AX share-grow][WARN] $*" >&2
+  echo "[Piccolo-AX share-grow][WARN] $*" >&2
 }
 
 share_dev="$(blkid -L "$LABEL_NAME" 2>/dev/null || true)"
 if [ -z "$share_dev" ]; then
-    log_warn "Label '$LABEL_NAME' not found; skipping expansion."
-    exit 0
+  log_warn "Label '$LABEL_NAME' not found; skipping expansion."
+  exit 0
 fi
 
 # Resolve whole block device and partition number (supports /dev/sdX2, /dev/nvmeXnYpZ, /dev/mmcblkXpY)
 base_name="$(lsblk -no pkname "$share_dev" 2>/dev/null | head -n1 || true)"
 if [ -n "$base_name" ]; then
-    disk_dev="/dev/${base_name}"
+  disk_dev="/dev/${base_name}"
 else
-    case "$share_dev" in
-        /dev/nvme*p[0-9]*|/dev/mmcblk*p[0-9]*)
-            disk_dev="${share_dev%p[0-9]*}"
-            ;;
-        *)
-            disk_dev="${share_dev%%[0-9]*}"
-            ;;
-    esac
+  case "$share_dev" in
+    /dev/nvme*p[0-9]*|/dev/mmcblk*p[0-9]*)
+      disk_dev="${share_dev%p[0-9]*}"
+      ;;
+    *)
+      disk_dev="${share_dev%%[0-9]*}"
+      ;;
+  esac
 fi
 
 part_sys="/sys/class/block/$(basename "$share_dev")/partition"
 if [ -r "$part_sys" ]; then
-    part_num="$(cat "$part_sys" 2>/dev/null || true)"
+  part_num="$(cat "$part_sys" 2>/dev/null || true)"
 else
-    part_num="$(echo "$share_dev" | sed -n 's/.*[^0-9]\([0-9][0-9]*\)$/\1/p')"
+  part_num="$(echo "$share_dev" | sed -n 's/.*[^0-9]\([0-9][0-9]*\)$/\1/p')"
 fi
 
-if [ ! -b "$disk_dev" ] \vert{}\vert{} [ -z "$part_num" ]; then
-    log_warn "Unable to resolve parent disk or partition number for '$share_dev'."
-    exit 0
+if [ ! -b "$disk_dev" ] || [ -z "$part_num" ]; then
+  log_warn "Unable to resolve parent disk or partition number for '$share_dev'."
+  exit 0
 fi
 
 # Inspect free space in MiB; specifically detect free space at end of device if reported
 free_mib=0
 if command -v parted >/dev/null 2>&1; then
-    free_mib="$(parted -ms "$disk_dev" unit MiB print free 2>/dev/null | awk -F: '
-        $NF ~ /^free;/ {
-            val = $4
-            sub(/MiB$/, "", val)
-            if ((val + 0) > max) max = (val + 0)
-        }
-        END { print max + 0 }
-    ')"
+  free_mib="$(parted -ms "$disk_dev" unit MiB print free 2>/dev/null | awk -F: '
+    $NF ~ /^free;/ {
+      val = $4
+      sub(/MiB$/, "", val)
+      if ((val + 0) > max) max = (val + 0)
+    }
+    END { print max + 0 }
+  ')"
 fi
 
 if [ "${free_mib:-0}" -lt "$MIN_FREE_MIB" ]; then
-    log_info "SHARE ($share_dev) already uses available space on $disk_dev (${free_mib:-0} MiB free)."
-    exit 0
+  log_info "SHARE ($share_dev) already uses available space on $disk_dev (${free_mib:-0} MiB free)."
+  exit 0
 fi
 
 was_mounted=0
 if grep -qs "^${share_dev}[[:space:]]" /proc/mounts; then
-    was_mounted=1
+  was_mounted=1
 fi
 
 log_info "Expanding $share_dev on $disk_dev (${free_mib} MiB unallocated space detected)..."
 
 # Relocate GPT backup header to the end of the 64 GB / 128 GB flash device before resizing
 if command -v sgdisk >/dev/null 2>&1; then
-    sgdisk -e "$disk_dev" >/dev/null 2>&1 || true
+  sgdisk -e "$disk_dev" >/dev/null 2>&1 || true
 fi
 
 # Grow partition to 100% of the drive
 if command -v parted >/dev/null 2>&1; then
-    parted -s -f "$disk_dev" resizepart "$part_num" 100% >/dev/null 2>&1 || true
+  parted -s -f "$disk_dev" resizepart "$part_num" 100% >/dev/null 2>&1 || true
 elif command -v sfdisk >/dev/null 2>&1; then
-    echo ", +" | sfdisk -N "$part_num" --no-reread "$disk_dev" >/dev/null 2>&1 || true
+  echo ", +" | sfdisk -N "$part_num" --no-reread "$disk_dev" >/dev/null 2>&1 || true
 fi
 
-partprobe "$disk_dev" 2>/dev/null \vert{}\vert{} blockdev --rereadpt "$disk_dev" 2>/dev/null || true
+partprobe "$disk_dev" 2>/dev/null || blockdev --rereadpt "$disk_dev" 2>/dev/null || true
 udevadm settle 2>/dev/null || sleep 1
 
 # Refresh blkid cache and re-resolve device node if needed
 blkid -g >/dev/null 2>&1 || true
 refreshed_dev="$(blkid -L "$LABEL_NAME" 2>/dev/null || true)"
 if [ -n "$refreshed_dev" ]; then
-    share_dev="$refreshed_dev"
+  share_dev="$refreshed_dev"
 fi
 
 # Grow the journal-free ext4 filesystem
 if [ "$was_mounted" -eq 0 ]; then
-    e2fsck -pf "$share_dev" >/dev/null 2>&1 || true
+  e2fsck -pf "$share_dev" >/dev/null 2>&1 || true
 fi
 
 if command -v resize2fs >/dev/null 2>&1; then
-    resize2fs "$share_dev" >/dev/null
-    udevadm settle 2>/dev/null || true
-    log_info "Expanded $LABEL_NAME ($share_dev) successfully."
+  resize2fs "$share_dev" >/dev/null
+  udevadm settle 2>/dev/null || true
+  log_info "Expanded $LABEL_NAME ($share_dev) successfully."
 else
-    log_warn "resize2fs not found; partition resized but filesystem still needs resize2fs."
+  log_warn "resize2fs not found; partition resized but filesystem still needs resize2fs."
 fi
 ```
 
-### 5. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/etc/init.d/S01piccolo-isolate`
+### 5\. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/etc/init.d/S01piccolo-isolate`
 
 ```sh
 #!/bin/sh
@@ -433,23 +439,23 @@ case "$1" in
 
     # 512 MB LZ4 zram emergency compression valve pinned to Core 5
     if [ -b /dev/zram0 ]; then
-        taskset -c 5 zramctl /dev/zram0 --algorithm lz4 --size 512M
-        mkswap /dev/zram0 >/dev/null
-        swapon -p 100 /dev/zram0
+      taskset -c 5 zramctl /dev/zram0 --algorithm lz4 --size 512M
+      mkswap /dev/zram0 >/dev/null
+      swapon -p 100 /dev/zram0
     fi
 
     # Enforce pcie_aspm=off & lock GTX 980 Ti power state
     if [ -e /sys/bus/pci/devices/0000:01:00.0/power/control ]; then
-        echo "on" > /sys/bus/pci/devices/0000:01:00.0/power/control
+      echo "on" > /sys/bus/pci/devices/0000:01:00.0/power/control
     fi
 
     # Pre-mount e2fsck & first-boot expansion on journal-free SHARE partition
     SHARE_DEV=$(blkid -L SHARE 2>/dev/null || true)
     if [ -n "$SHARE_DEV" ]; then
-        e2fsck -p "$SHARE_DEV" >/dev/null 2>&1 || true
-        if [ -x /usr/bin/ax-grow-share.sh ]; then
-            /usr/bin/ax-grow-share.sh || true
-        fi
+      e2fsck -p "$SHARE_DEV" >/dev/null 2>&1 || true
+      if [ -x /usr/bin/ax-grow-share.sh ]; then
+        /usr/bin/ax-grow-share.sh || true
+      fi
     fi
     ;;
   stop)
@@ -458,7 +464,7 @@ esac
 exit 0
 ```
 
-### 6. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/etc/init.d/S02piccolo-hw`
+### 6\. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/etc/init.d/S02piccolo-hw`
 
 ```sh
 #!/bin/sh
@@ -480,18 +486,18 @@ EOF
 
     # Bind GTX 980 Ti MSI IRQ to Core 1 (0x02)
     for irq in $(grep -i "nvidia" /proc/interrupts 2>/dev/null | awk -F: '{print $1}' | tr -d ' '); do
-        echo 02 > "/proc/irq/${irq}/smp_affinity" 2>/dev/null || true
+      echo 02 > "/proc/irq/${irq}/smp_affinity" 2>/dev/null || true
     done
 
     # Bind HiBy FC3 xHCI controller MSI IRQ to Core 0 (0x01)
     FC3_BUS=$(lsusb 2>/dev/null | grep -iE "2fc6|32bb|HiBy" | awk '{print $2}' | sed 's/^0*//' | head -n1)
     if [ -n "$FC3_BUS" ] && [ -e "/sys/bus/usb/devices/usb${FC3_BUS}/../" ]; then
-        XHCI_PCI=$(basename "$(readlink -f "/sys/bus/usb/devices/usb${FC3_BUS}/../")" 2>/dev/null || true)
-        if [ -n "$XHCI_PCI" ]; then
-            for irq in $(grep -F "${XHCI_PCI}" /proc/interrupts 2>/dev/null | awk -F: '{print $1}' | tr -d ' '); do
-                echo 01 > "/proc/irq/${irq}/smp_affinity" 2>/dev/null || true
-            done
-        fi
+      XHCI_PCI=$(basename "$(readlink -f "/sys/bus/usb/devices/usb${FC3_BUS}/../")" 2>/dev/null || true)
+      if [ -n "$XHCI_PCI" ]; then
+        for irq in $(grep -F "${XHCI_PCI}" /proc/interrupts 2>/dev/null | awk -F: '{print $1}' | tr -d ' '); do
+          echo 01 > "/proc/irq/${irq}/smp_affinity" 2>/dev/null || true
+        done
+      fi
     fi
 
     # Enable NVIDIA persistence mode (580.* legacy branch)
@@ -502,8 +508,8 @@ EOF
 
     # Only prepare /userdata rom mountpoints if SHARE / userdata is mounted, then mount SwitchHDD async on Core 5
     if grep -qs "[[:space:]]/userdata[[:space:]]" /proc/mounts; then
-        mkdir -p /userdata/roms/switch /userdata/roms/wiiu /userdata/roms/n64
-        taskset -c 5 sh -c 'mount -L SwitchHDD -o ro,noatime /userdata/roms/switch 2>/dev/null || true' &
+      mkdir -p /userdata/roms/switch /userdata/roms/wiiu /userdata/roms/n64
+      taskset -c 5 sh -c 'mount -L SwitchHDD -o ro,noatime /userdata/roms/switch 2>/dev/null || true' &
     fi
     ;;
   stop)
@@ -512,7 +518,7 @@ esac
 exit 0
 ```
 
-### 7. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/etc/init.d/K01piccolo-sync`
+### 7\. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/etc/init.d/K01piccolo-sync`
 
 ```sh
 #!/bin/sh
@@ -525,94 +531,94 @@ STAGE_DIR="${SHARE_MOUNT}/system/ax-sync"
 LOG_TAG="[Piccolo-AX sync]"
 
 log_info() {
-    echo "${LOG_TAG}$*"
+  echo "${LOG_TAG} $*"
 }
 
 log_warn() {
-    echo "${LOG_TAG}[WARN]$*" >&2
+  echo "${LOG_TAG}[WARN] $*" >&2
 }
 
 is_share_mounted() {
-    grep -qs "[[:space:]]${SHARE_MOUNT}[[:space:]]" /proc/mounts
+  grep -qs "[[:space:]]${SHARE_MOUNT}[[:space:]]" /proc/mounts
 }
 
 # Pack a source directory into an atomic .tar.zst archive on SHARE
 pack_dir_atomic() {
-    src_dir="$1"
-    dest_tar="$2"
+  src_dir="$1"
+  dest_tar="$2"
 
-    if [ ! -d "$src_dir" ]; then
-        return 0
-    fi
+  if [ ! -d "$src_dir" ]; then
+    return 0
+  fi
 
-    # Skip empty directories so we avoid unnecessary flash writes
-    if [ -z "$(ls -A "$src_dir" 2>/dev/null || true)" ]; then
-        return 0
-    fi
+  # Skip empty directories so we avoid unnecessary flash writes
+  if [ -z "$(ls -A "$src_dir" 2>/dev/null || true)" ]; then
+    return 0
+  fi
 
-    mkdir -p "$(dirname "$dest_tar")"
-    tmp_tar="${dest_tar}.tmp.$$"
+  mkdir -p "$(dirname "$dest_tar")"
+  tmp_tar="${dest_tar}.tmp.$$"
 
-    if command -v zstd >/dev/null 2>&1; then
-        tar -C "$src_dir" -cf - . 2>/dev/null \vert{} zstd -3 -T0 -q -o "$tmp_tar" 2>/dev/null || {
-            rm -f "$tmp_tar"
-            log_warn "Failed compressing '$src_dir' -> '$dest_tar'"
-            return 0
-        }
-    else
-        tar -C "$src_dir" -cf "$tmp_tar" . 2>/dev/null || {
-            rm -f "$tmp_tar"
-            log_warn "Failed archiving '$src_dir' -> '$dest_tar'"
-            return 0
-        }
-    fi
+  if command -v zstd >/dev/null 2>&1; then
+    tar -C "$src_dir" -cf - . 2>/dev/null | zstd -3 -T0 -q -o "$tmp_tar" 2>/dev/null || {
+      rm -f "$tmp_tar"
+      log_warn "Failed compressing '$src_dir' -> '$dest_tar'"
+      return 0
+    }
+  else
+    tar -C "$src_dir" -cf "$tmp_tar" . 2>/dev/null || {
+      rm -f "$tmp_tar"
+      log_warn "Failed archiving '$src_dir' -> '$dest_tar'"
+      return 0
+    }
+  fi
 
-    if [ -s "$tmp_tar" ]; then
-        mv -f "$tmp_tar" "$dest_tar"
-        log_info "Flushed '$src_dir' -> '$dest_tar' ($(du -h "$dest_tar" 2>/dev/null | awk '{print $1}'))"
-    else
-        rm -f "$tmp_tar"
-    fi
+  if [ -s "$tmp_tar" ]; then
+    mv -f "$tmp_tar" "$dest_tar"
+    log_info "Flushed '$src_dir' -> '$dest_tar' ($(du -h "$dest_tar" 2>/dev/null | awk '{print $1}'))"
+  else
+    rm -f "$tmp_tar"
+  fi
 }
 
 case "${1:-}" in
-    stop)
-        if ! is_share_mounted; then
-            log_warn "'${SHARE_MOUNT}' is not mounted; skipping RAM cache flush."
-            exit 0
-        fi
+  stop)
+    if ! is_share_mounted; then
+      log_warn "'${SHARE_MOUNT}' is not mounted; skipping RAM cache flush."
+      exit 0
+    fi
 
-        log_info "Flushing RAM caches to ${SHARE_MOUNT}..."
-        pack_dir_atomic "/dev/shm/emu_cache" "${STAGE_DIR}/emu_cache.tar.zst"
-        pack_dir_atomic "/dev/shm/pgo"       "${STAGE_DIR}/pgo.tar.zst"
-        pack_dir_atomic "/dev/shm/nv_cache"  "${STAGE_DIR}/nv_cache.tar.zst"
+    log_info "Flushing RAM caches to ${SHARE_MOUNT}..."
+    pack_dir_atomic "/dev/shm/emu_cache" "${STAGE_DIR}/emu_cache.tar.zst"
+    pack_dir_atomic "/dev/shm/pgo" "${STAGE_DIR}/pgo.tar.zst"
+    pack_dir_atomic "/dev/shm/nv_cache" "${STAGE_DIR}/nv_cache.tar.zst"
 
-        sync
-        ;;
-    start)
-        # Optional restore hook if archives exist and target /dev/shm dirs are empty
-        if is_share_mounted && command -v zstd >/dev/null 2>&1; then
-            for item in "emu_cache:/dev/shm/emu_cache" "pgo:/dev/shm/pgo" "nv_cache:/dev/shm/nv_cache"; do
-                name="${item%%:*}"
-                dst="${item#*:}"
-                arc="${STAGE_DIR}/${name}.tar.zst"
-                mkdir -p "$dst"
-                if [ -f "$arc" ] && [ -z "$(ls -A "$dst" 2>/dev/null || true)" ]; then
-                    zstd -dc -q "$arc" 2>/dev/null \vert{} tar -C "$dst" -xf - 2>/dev/null || true
-                fi
-            done
+    sync
+    ;;
+  start)
+    # Optional restore hook if archives exist and target /dev/shm dirs are empty
+    if is_share_mounted && command -v zstd >/dev/null 2>&1; then
+      for item in "emu_cache:/dev/shm/emu_cache" "pgo:/dev/shm/pgo" "nv_cache:/dev/shm/nv_cache"; do
+        name="${item%%:*}"
+        dst="${item#*:}"
+        arc="${STAGE_DIR}/${name}.tar.zst"
+        mkdir -p "$dst"
+        if [ -f "$arc" ] && [ -z "$(ls -A "$dst" 2>/dev/null || true)" ]; then
+          zstd -dc -q "$arc" 2>/dev/null | tar -C "$dst" -xf - 2>/dev/null || true
         fi
-        ;;
-    *)
-        echo "Usage: $0 {start|stop}"
-        exit 1
-        ;;
+      done
+    fi
+    ;;
+  *)
+    echo "Usage: $0 {start|stop}"
+    exit 1
+    ;;
 esac
 
 exit 0
 ```
 
-### 8. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/usr/bin/ax-mode-cli`
+### 8\. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/usr/bin/ax-mode-cli`
 
 ```sh
 #!/bin/sh
@@ -623,10 +629,10 @@ DAC_LOCK="/run/lock/ax-dac.lock"
 AX_MODE="retro"
 
 for token in $(cat /proc/cmdline 2>/dev/null || true); do
-    case "$token" in
-        ax.mode=*) AX_MODE="${token#ax.mode=}" ;;
-        ax.dac_lock=*) DAC_LOCK="${token#ax.dac_lock=}" ;;
-    esac
+  case "$token" in
+    ax.mode=*) AX_MODE="${token#ax.mode=}" ;;
+    ax.dac_lock=*) DAC_LOCK="${token#ax.dac_lock=}" ;;
+  esac
 done
 
 mkdir -p /run/lock
@@ -634,236 +640,237 @@ chmod 1777 /run/lock 2>/dev/null || true
 touch "$DAC_LOCK" 2>/dev/null || true
 
 run_rt_dac() {
-    if ! flock -n "$DAC_LOCK" taskset 0x01 chrt -f 80 "$@"; then
-        echo "[Piccolo-AX] Failed to acquire ${DAC_LOCK} or foreground process exited with error."
-        sleep 2
-    fi
+  if ! flock -n "$DAC_LOCK" taskset 0x01 chrt -f 80 "$@"; then
+    echo "[Piccolo-AX] Failed to acquire ${DAC_LOCK} or foreground process exited with error."
+    sleep 2
+  fi
 }
 
 ensure_media_dir() {
-    dir_path="$1"
-    if [ ! -d "$dir_path" ]; then
-        echo "[Piccolo-AX][WARN] Directory '$dir_path' not found; creating it on /userdata..."
-        mkdir -p "$dir_path" 2>/dev/null || true
-    fi
+  dir_path="$1"
+  if [ ! -d "$dir_path" ]; then
+    echo "[Piccolo-AX][WARN] Directory '$dir_path' not found; creating it on /userdata..."
+    mkdir -p "$dir_path" 2>/dev/null || true
+  fi
 }
 
 status_line() {
-    share_info="SHARE: unmounted"
-    if df -h /userdata >/dev/null 2>&1 && grep -qs "[[:space:]]/userdata[[:space:]]" /proc/mounts; then
-        share_info="$(df -h /userdata 2>/dev/null | awk 'NR==2 {printf "SHARE: %s avail (%s used)", $4, $5}')"
-    fi
+  share_info="SHARE: unmounted"
+  if df -h /userdata >/dev/null 2>&1 && grep -qs "[[:space:]]/userdata[[:space:]]" /proc/mounts; then
+    share_info="$(df -h /userdata 2>/dev/null | awk 'NR==2 {printf "SHARE: %s avail (%s used)", $4, $5}')"
+  fi
 
-    dac_info="DAC: absent"
-    if command -v aplay >/dev/null 2>&1 && aplay -l 2>/dev/null | grep -q "FC3"; then
-        dac_info="DAC: FC3 ready"
-    fi
+  dac_info="DAC: absent"
+  if command -v aplay >/dev/null 2>&1 && aplay -l 2>/dev/null | grep -q "FC3"; then
+    dac_info="DAC: FC3 ready"
+  fi
 
-    echo "  Status: ${share_info} \vert{}${dac_info}"
+  echo "  Status: ${share_info} | ${dac_info}"
 }
 
 # Desktop mode launches piccolo-ax-desktop directly with /userdata persistence
 if [ "$AX_MODE" = "desktop" ]; then
-    if [ -x /usr/local/bin/launch-desktop.sh ]; then
-        exec /usr/local/bin/launch-desktop.sh
-    elif [ -x /usr/bin/piccolo-ax-desktop ]; then
-        exec /usr/bin/piccolo-ax-desktop
-    else
-        echo "[Piccolo-AX] Desktop overlay not installed in this image. Rebooting..."
-        sleep 3
-        exec reboot
-    fi
+  if [ -x /usr/local/bin/launch-desktop.sh ]; then
+    exec /usr/local/bin/launch-desktop.sh
+  elif [ -x /usr/bin/piccolo-ax-desktop ]; then
+    exec /usr/bin/piccolo-ax-desktop
+  else
+    echo "[Piccolo-AX] Desktop overlay not installed in this image. Rebooting..."
+    sleep 3
+    exec reboot
+  fi
 fi
 
 while true; do
-    clear
-    echo "============================================================"
-    echo "  Piccolo [AX] Bare-Metal Appliance — Mode: ${AX_MODE}"
-    status_line
-    echo "============================================================"
+  clear
+  echo "============================================================"
+  echo " Piccolo [AX] Bare-Metal Appliance — Mode: ${AX_MODE}"
+  status_line
+  echo "============================================================"
 
-    case "$AX_MODE" in
-        audio)
-            echo "  1) flac_ax        — Bit-Perfect FLAC / DSD RAM Transport"
-            echo "  2) ax_av_studio   — 2.00 ms Live Synth & FFT Studio"
-            echo "  v) Verify Appliance Hardware Gate"
-            echo "  r) Reboot to Limine Boot Menu"
-            printf "\nSelect option: "
-            read -r choice
-            case "$choice" in
-                1)
-                    ensure_media_dir "/userdata/music"
-                    run_rt_dac /usr/bin/flac_ax --device "$DAC_DEV" --volume 0.80 /userdata/music/
-                    ;;
-                2)
-                    run_rt_dac /usr/bin/ax_av_studio --fullscreen --device "$DAC_DEV" --volume 0.80
-                    ;;
-                v|V)
-                    /usr/bin/verify_ax_appliance.sh
-                    printf "\nPress Enter..."
-                    read -r _
-                    ;;
-                r|R)
-                    exec reboot
-                    ;;
-            esac
-            ;;
+  case "$AX_MODE" in
+    audio)
+      echo "  1) flac_ax — Bit-Perfect FLAC / DSD RAM Transport"
+      echo "  2) ax_av_studio — 2.00 ms Live Synth & FFT Studio"
+      echo "  v) Verify Appliance Hardware Gate"
+      echo "  r) Reboot to Limine Boot Menu"
+      printf "\nSelect option: "
+      read -r choice
+      case "$choice" in
+        1)
+          ensure_media_dir "/userdata/music"
+          run_rt_dac /usr/bin/flac_ax --device "$DAC_DEV" --volume 0.80 /userdata/music/
+          ;;
+        2)
+          run_rt_dac /usr/bin/ax_av_studio --fullscreen --device "$DAC_DEV" --volume 0.80
+          ;;
+        v|V)
+          /usr/bin/verify_ax_appliance.sh
+          printf "\nPress Enter..."
+          read -r _
+          ;;
+        r|R)
+          exec reboot
+          ;;
+      esac
+      ;;
 
-        upscaler)
-            echo "  1) Retro HDMI Capture (MS2130S -> 1080p Bob)"
-            echo "  2) Retro HDMI Capture (MS2130S -> 2K Bob)"
-            echo "  3) DVD ISO Upscaler   (Audio-Master PTS -> 2K)"
-            echo "  v) Verify Appliance Hardware Gate"
-            echo "  r) Reboot to Limine Boot Menu"
-            printf "\nSelect option: "
-            read -r choice
-            case "$choice" in
-                1)
-                    run_rt_dac /usr/bin/ax_video_upscaler --mode retro --preset 1080p --v4l2 /dev/video0 --scan bob --device "$DAC_DEV" --volume 0.80
-                    ;;
-                2)
-                    run_rt_dac /usr/bin/ax_video_upscaler --mode retro --preset 2k --v4l2 /dev/video0 --scan bob --device "$DAC_DEV" --volume 0.80
-                    ;;
-                3)
-                    ensure_media_dir "/userdata/dvd"
-                    run_rt_dac /usr/bin/ax_video_upscaler --mode dvd --preset 2k --input /userdata/dvd/ --scan dvd --device "$DAC_DEV" --volume 0.80
-                    ;;
-                v|V)
-                    /usr/bin/verify_ax_appliance.sh
-                    printf "\nPress Enter..."
-                    read -r _
-                    ;;
-                r|R)
-                    exec reboot
-                    ;;
-            esac
-            ;;
+    upscaler)
+      echo "  1) Retro HDMI Capture (MS2130S -> 1080p Bob)"
+      echo "  2) Retro HDMI Capture (MS2130S -> 2K Bob)"
+      echo "  3) DVD ISO Upscaler (Audio-Master PTS -> 2K)"
+      echo "  v) Verify Appliance Hardware Gate"
+      echo "  r) Reboot to Limine Boot Menu"
+      printf "\nSelect option: "
+      read -r choice
+      case "$choice" in
+        1)
+          run_rt_dac /usr/bin/ax_video_upscaler --mode retro --preset 1080p --v4l2 /dev/video0 --scan bob --device "$DAC_DEV" --volume 0.80
+          ;;
+        2)
+          run_rt_dac /usr/bin/ax_video_upscaler --mode retro --preset 2k --v4l2 /dev/video0 --scan bob --device "$DAC_DEV" --volume 0.80
+          ;;
+        3)
+          ensure_media_dir "/userdata/dvd"
+          run_rt_dac /usr/bin/ax_video_upscaler --mode dvd --preset 2k --input /userdata/dvd/ --scan dvd --device "$DAC_DEV" --volume 0.80
+          ;;
+        v|V)
+          /usr/bin/verify_ax_appliance.sh
+          printf "\nPress Enter..."
+          read -r _
+          ;;
+        r|R)
+          exec reboot
+          ;;
+      esac
+      ;;
 
-        retro)
-            echo "  1) EmulationStation   (Unified Retro Front-End)"
-            echo "  2) Eden-Espresso-Wave (Nintendo Switch)"
-            echo "  3) Cemu-Latte-AX      (Nintendo Wii U)"
-            echo "  4) Generation-X-AX    (Classic Consoles & Arcade)"
-            echo "  v) Verify Appliance Hardware Gate"
-            echo "  r) Reboot to Limine Boot Menu"
-            printf "\nSelect option: "
-            read -r choice
-            case "$choice" in
-                1) /usr/bin/emulationstation ;;
-                2) /usr/bin/eden ;;
-                3) /usr/bin/Cemu ;;
-                4) /usr/bin/generation-x-launcher ;;
-                v|V)
-                    /usr/bin/verify_ax_appliance.sh
-                    printf "\nPress Enter..."
-                    read -r _
-                    ;;
-                r|R)
-                    exec reboot
-                    ;;
-            esac
-            ;;
+    retro)
+      echo "  1) EmulationStation (Unified Retro Front-End)"
+      echo "  2) Eden-Espresso-Wave (Nintendo Switch)"
+      echo "  3) Cemu-Latte-AX (Nintendo Wii U)"
+      echo "  4) Generation-X-AX (Classic Consoles & Arcade)"
+      echo "  v) Verify Appliance Hardware Gate"
+      echo "  r) Reboot to Limine Boot Menu"
+      printf "\nSelect option: "
+      read -r choice
+      case "$choice" in
+        1) /usr/bin/emulationstation ;;
+        2) /usr/bin/eden ;;
+        3) /usr/bin/Cemu ;;
+        4) /usr/bin/generation-x-launcher ;;
+        v|V)
+          /usr/bin/verify_ax_appliance.sh
+          printf "\nPress Enter..."
+          read -r _
+          ;;
+        r|R)
+          exec reboot
+          ;;
+      esac
+      ;;
 
-        *)
-            echo "  [WARN] Unknown ax.mode='${AX_MODE}'. Press 'r' to reboot to Limine."
-            printf "\nSelect option: "
-            read -r choice
-            case "$choice" in
-                r|R) exec reboot ;;
-            esac
-            ;;
-    esac
+    *)
+      echo "  [WARN] Unknown ax.mode='${AX_MODE}'. Press 'r' to reboot to Limine."
+      printf "\nSelect option: "
+      read -r choice
+      case "$choice" in
+        r|R) exec reboot ;;
+      esac
+      ;;
+  esac
 done
 ```
 
-### 9. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/usr/bin/verify_ax_appliance.sh`
+### 9\. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/usr/bin/verify_ax_appliance.sh`
 
 ```sh
 #!/usr/bin/env bash
 set -euo pipefail
 
 echo "============================================================"
-echo "  PICCOLO [AX] — BARE-METAL APPLIANCE HARDWARE VERIFICATION"
+echo " PICCOLO [AX] — BARE-METAL APPLIANCE HARDWARE VERIFICATION"
 echo "============================================================"
 FAIL=0
 
 # 1. Tickless Isolation & mitigations=off
 if grep -q "mitigations=off" /proc/cmdline && grep -q "nohz_full=0-4" /proc/cmdline; then
-    echo "[PASS] 1. Kernel cmdline: nohz_full=0-4, rcu_nocbs=0-4, mitigations=off active"
+  echo "[PASS] 1. Kernel cmdline: nohz_full=0-4, rcu_nocbs=0-4, mitigations=off active"
 else
-    echo "[FAIL] 1. Missing required kernel isolation flags in /proc/cmdline"
-    FAIL=1
+  echo "[FAIL] 1. Missing required kernel isolation flags in /proc/cmdline"
+  FAIL=1
 fi
 
 # 2. Intel CAT MSR 0xc8f Probe
 if command -v rdmsr >/dev/null 2>&1 && rdmsr 0xc8f >/dev/null 2>&1; then
-    echo "[PASS] 2. Intel CAT MSR 0xc8f accessible (Hardware L3 partitioning available)"
+  echo "[PASS] 2. Intel CAT MSR 0xc8f accessible (Hardware L3 partitioning available)"
 else
-    echo "[WARN] 2. Intel CAT MSR 0xc8f fused/unavailable — engaging _MM_HINT_NTA Core 5 fallback"
+  echo "[WARN] 2. Intel CAT MSR 0xc8f fused/unavailable — engaging _MM_HINT_NTA Core 5 fallback"
 fi
 
 # 3. HugePages (6x 1G + 1024x 2M) & zram Check
 HP_1G=$(grep -E "^HugePages_Total:" /proc/meminfo 2>/dev/null | awk '{print $2}')
 if [ "${HP_1G:-0}" -ge 6 ] && [ -b /dev/zram0 ]; then
-    echo "[PASS] 3. Hybrid HugePages (${HP_1G}x 1G) & LZ4 zram active"
+  echo "[PASS] 3. Hybrid HugePages (${HP_1G}x 1G) & LZ4 zram active"
 else
-    echo "[FAIL] 3. HugePages (${HP_1G:-0}) or /dev/zram0 not configured"
-    FAIL=1
+  echo "[FAIL] 3. HugePages (${HP_1G:-0}) or /dev/zram0 not configured"
+  FAIL=1
 fi
 
 # 4. NVIDIA 580.* Legacy Driver & Persistence Mode
 if command -v nvidia-smi >/dev/null 2>&1; then
-    NV_VER=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null || echo "NONE")
-    if [[ "${NV_VER}" == 580.* ]]; then
-        echo "[PASS] 4. NVIDIA Maxwell legacy driver pinned: ${NV_VER}"
-    else
-        echo "[WARN] 4. Expected NVIDIA 580.* driver, found: ${NV_VER}"
-    fi
+  NV_VER=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null || echo "NONE")
+  if [[ "${NV_VER}" == 580.* ]]; then
+    echo "[PASS] 4. NVIDIA Maxwell legacy driver pinned: ${NV_VER}"
+  else
+    echo "[WARN] 4. Expected NVIDIA 580.* driver, found: ${NV_VER}"
+  fi
 else
-    echo "[WARN] 4. nvidia-smi not present in this mode/image"
+  echo "[WARN] 4. nvidia-smi not present in this mode/image"
 fi
 
 # 5. Intel UHD 630 VA-API (iHD) Render Node
 if [ -e /dev/dri/renderD128 ] || [ -e /dev/dri/renderD129 ]; then
-    echo "[PASS] 5. DRI render node present for Intel UHD 630 VA-API (iHD) dma_buf export"
+  echo "[PASS] 5. DRI render node present for Intel UHD 630 VA-API (iHD) dma_buf export"
 else
-    echo "[FAIL] 5. Missing /dev/dri/renderD* node (Enable IGD Multi-Monitor in BIOS)"
-    FAIL=1
+  echo "[FAIL] 5. Missing /dev/dri/renderD* node (Enable IGD Multi-Monitor in BIOS)"
+  FAIL=1
 fi
 
 # 6. HiBy FC3 USB DAC Exclusive ALSA Node
 if command -v aplay >/dev/null 2>&1 && aplay -l 2>/dev/null | grep -q "FC3"; then
-    echo "[PASS] 6. HiBy FC3 USB DAC detected on ALSA hw:CARD=FC3,DEV=0"
+  echo "[PASS] 6. HiBy FC3 USB DAC detected on ALSA hw:CARD=FC3,DEV=0"
 else
-    echo "[WARN] 6. HiBy FC3 USB DAC not currently connected or aplay unavailable"
+  echo "[WARN] 6. HiBy FC3 USB DAC not currently connected or aplay unavailable"
 fi
 
 # 7. RootFS <= 512 MB Budget Check
 EROFS_PATH=""
 if [ -f /boot/rootfs.erofs ]; then
-    EROFS_PATH="/boot/rootfs.erofs"
+  EROFS_PATH="/boot/rootfs.erofs"
 elif [ -f /boot/boot/rootfs.erofs ]; then
-    EROFS_PATH="/boot/boot/rootfs.erofs"
+  EROFS_PATH="/boot/boot/rootfs.erofs"
 fi
 
 if [ -n "${EROFS_PATH}" ]; then
-    SIZE_MB=$(( $(stat -c%s "${EROFS_PATH}") / 1024 / 1024 ))
-    if [ "${SIZE_MB}" -le 512 ]; then
-        echo "[PASS] 7. EROFS image (${EROFS_PATH}) size: ${SIZE_MB} MB / 512 MB ceiling"
-    else
-        echo "[FAIL] 7. EROFS image (${EROFS_PATH}) size (${SIZE_MB} MB) exceeds 512 MB ceiling"
-        FAIL=1
-    fi
+  SIZE_MB=$(( $(stat -c%s "${EROFS_PATH}") / 1024 / 1024 ))
+  if [ "${SIZE_MB}" -le 512 ]; then
+    echo "[PASS] 7. EROFS image (${EROFS_PATH}) size: ${SIZE_MB} MB / 512 MB ceiling"
+  else
+    echo "[FAIL] 7. EROFS image (${EROFS_PATH}) size (${SIZE_MB} MB) exceeds 512 MB ceiling"
+    FAIL=1
+  fi
 else
-    echo "[WARN] 7. rootfs.erofs not mounted at /boot/rootfs.erofs or /boot/boot/rootfs.erofs"
+  echo "[WARN] 7. rootfs.erofs not mounted at /boot/rootfs.erofs or /boot/boot/rootfs.erofs"
 fi
 
 echo "============================================================"
 if [ "$FAIL" -eq 0 ]; then
-    echo "RESULT: EXCELLENT_APPLIANCE_READY"
-    exit 0
+  echo "RESULT: EXCELLENT_APPLIANCE_READY"
+  exit 0
 else
-    echo "RESULT: APPLIANCE_GATE_FAILED"
-    exit 1
+  echo "RESULT: APPLIANCE_GATE_FAILED"
+  exit 1
 fi
 ```
+
