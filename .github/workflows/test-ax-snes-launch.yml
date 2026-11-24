@@ -20,30 +20,21 @@ jobs:
       - name: Checkout Piccolo-AX
         uses: actions/checkout@v5
         with:
-          path: Piccolo-AX
           fetch-depth: 1
-          submodules: false
-          persist-credentials: false
-
-      - name: Checkout Generation-X-AX
-        uses: actions/checkout@v5
-        with:
-          repository: galaxywarriordad/Generation-X-AX
-          path: Generation-X-AX
-          fetch-depth: 1
-          submodules: false
-          persist-credentials: false
 
       - name: Install shellcheck
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends shellcheck
 
-      - name: Syntax, ShellCheck, and No-Argument Usage Check
+      - name: Fetch and Verify ax-snes-launch.sh (Syntax, ShellCheck & Exit Code 2)
         run: |
           set -euo pipefail
-          LAUNCHER="Generation-X-AX/scripts/ax-snes-launch.sh"
-          test -f "${LAUNCHER}"
+          LAUNCHER="/tmp/ax-snes-launch.sh"
+          curl -fsSL \
+            "https://raw.githubusercontent.com/galaxywarriordad/Generation-X-AX/main/scripts/ax-snes-launch.sh" \
+            -o "${LAUNCHER}"
+
           chmod +x "${LAUNCHER}"
           sh -n "${LAUNCHER}"
           shellcheck -x "${LAUNCHER}"
@@ -59,4 +50,4 @@ jobs:
 
       - name: Clean Temporary Test Artifacts
         if: always()
-        run: rm -f /tmp/snes_usage.out
+        run: rm -f /tmp/ax-snes-launch.sh /tmp/snes_usage.out
