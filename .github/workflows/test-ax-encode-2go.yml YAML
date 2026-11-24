@@ -1,0 +1,74 @@
+name: Test ax-encode-2go (640x480 G350 Pipeline)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ax-encode-2go"
+      - ".github/workflows/test-ax-encode-2go.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "ax-encode-2go"
+      - ".github/workflows/test-ax-encode-2go.yml"
+  workflow_dispatch:
+
+jobs:
+  test-ax-encode-2go:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Piccolo-AX
+        uses: actions/checkout@v5
+
+      - name: Install shellcheck, ffmpeg, and util-linux
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends shellcheck ffmpeg util-linux
+
+      - name: Lint and Verify CLI Behavior
+        run: |
+          test -f ax-encode-2go
+          chmod +x ax-encode-2go
+          sh -n ax-encode-2go
+          shellcheck -x ax-encode-2go
+          if ax-encode-2go --help >/tmp/help.out 2>&1; then
+            echo "Expected non-zero exit from --help usage" >&2
+            exit 1
+          fi
+          grep -q "Usage: ax-encode-2go" /tmp/help.out
+
+      - name: Run Synthetic 640x480 Encode and Verify Streams
+        run: |
+          ffmpeg -y -hide_banner -loglevel error \
+            -f lavfi -i "testsrc2=duration=2:size=1280x720:rate=60" \
+            -f lavfi -i "sine=frequency=1000:sample_rate=44100:duration=2" \
+            -c:v libx264 -pix_fmt yuv420p -preset ultrafast \
+            -c:a aac -ar 44100 -ac 2 \
+            /tmp/test_src.mp4
+
+          ./ax-encode-2go /tmp/test_src.mp4 /tmp/test_g350_640x480.mp4
+          test -s /tmp/test_g350_640x480.mp4
+
+          ffprobe -v error -select_streams v:0 \
+            -show_entries stream=width,height,codec_name,r_frame_rate \
+            -of default=noprint_wrappers=1 \
+            /tmp/test_g350_640x480.mp4 | tee /tmp/v_stream.txt
+
+          ffprobe -v error -select_streams a:0 \
+            -show_entries stream=codec_name,sample_rate,channels \
+            -of default=noprint_wrappers=1 \
+            /tmp/test_g350_640x480.mp4 | tee /tmp/a_stream.txt
+
+          grep -q "^width=640$" /tmp/v_stream.txt
+          grep -q "^height=480$" /tmp/v_stream.txt
+          grep -q "^codec_name=h264$" /tmp/v_stream.txt
+          grep -q "^r_frame_rate=30/1$" /tmp/v_stream.txt
+
+          grep -q "^codec_name=aac$" /tmp/a_stream.txt
+          grep -q "^sample_rate=48000$" /tmp/a_stream.txt
+          grep -q "^channels=2$" /tmp/a_stream.txt
+
+      - name: Clean Temporary Test Artifacts
+        if: always()
+        run: |
+          rm -f /tmp/help.out /tmp/test_src.mp4 /tmp/test_g350_640x480.mp4 /tmp/v_stream.txt /tmp/a_stream.txt
