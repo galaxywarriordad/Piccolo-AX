@@ -1,94 +1,68 @@
 #!/bin/sh
-# K01piccolo-sync — Atomic RAM tmpfs (/dev/shm) -> SHARE persistence on stop/shutdown
+### BEGIN INIT INFO
+# Provides:          K01piccolo-sync
+# Required-Start:    $local_fs
+# Required-Stop:     $local_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 6
+# Short-Description: Atomic /dev/shm to /userdata save & state sync for Piccolo-AX
+### END INIT INFO
 
-set -u
+set -eu
 
-SHARE_MOUNT="/userdata"
-STAGE_DIR="${SHARE_MOUNT}/system/ax-sync"
-LOG_TAG="[Piccolo-AX sync]"
+SHM_ROOT="/dev/shm/piccolo-ax"
+PERSIST_ROOT="/userdata"
+SNES_SHM_SAVES="${SHM_ROOT}/snes/saves"
+SNES_PERSIST_SAVES="${PERSIST_ROOT}/saves/snes"
+SNES_SHM_ROMS="${SHM_ROOT}/snes/roms"
 
-log_info() {
-    echo "${LOG_TAG} $*"
-}
-
-log_warn() {
-    echo "${LOG_TAG}[WARN] $*" >&2
-}
-
-is_share_mounted() {
-    grep -qs "[[:space:]]${SHARE_MOUNT}[[:space:]]" /proc/mounts
-}
-
-# Pack a source directory into an atomic .tar.zst archive on SHARE
-pack_dir_atomic() {
+sync_dir_atomic() {
     src_dir="$1"
-    dest_tar="$2"
+    dst_dir="$2"
 
-    if [ ! -d "$src_dir" ]; then
-        return 0
-    fi
+    [ -d "$src_dir" ] || return 0
+    mkdir -p "$dst_dir"
 
-    # Skip empty directories so we avoid unnecessary flash writes
-    if [ -z "$(ls -A "$src_dir" 2>/dev/null || true)" ]; then
-        return 0
-    fi
+    for f in "$src_dir"/*; do
+        [ -f "$f" ] || continue
+        base="$(basename "$f")"
+        dst_file="${dst_dir}/${base}"
+        tmp_file="${dst_file}.tmp.$$"
 
-    mkdir -p "$(dirname "$dest_tar")"
-    tmp_tar="${dest_tar}.tmp.$$"
-
-    if command -v zstd >/dev/null 2>&1; then
-        tar -C "$src_dir" -cf - . 2>/dev/null | zstd -3 -T0 -q -o "$tmp_tar" 2>/dev/null || {
-            rm -f "$tmp_tar"
-            log_warn "Failed compressing '$src_dir' -> '$dest_tar'"
-            return 0
-        }
-    else
-        tar -C "$src_dir" -cf "$tmp_tar" . 2>/dev/null || {
-            rm -f "$tmp_tar"
-            log_warn "Failed archiving '$src_dir' -> '$dest_tar'"
-            return 0
-        }
-    fi
-
-    if [ -s "$tmp_tar" ]; then
-        mv -f "$tmp_tar" "$dest_tar"
-        log_info "Flushed '$src_dir' -> '$dest_tar' ($(du -h "$dest_tar" 2>/dev/null | awk '{print $1}'))"
-    else
-        rm -f "$tmp_tar"
-    fi
+        cp -f "$f" "$tmp_file"
+        sync
+        mv -f "$tmp_file" "$dst_file"
+    done
+    sync
 }
 
-case "${1:-}" in
-    stop)
-        if ! is_share_mounted; then
-            log_warn "'${SHARE_MOUNT}' is not mounted; skipping RAM cache flush."
-            exit 0
-        fi
+stage_snes_saves() {
+    mkdir -p "$SNES_SHM_SAVES" "$SNES_SHM_ROMS" "$SNES_PERSIST_SAVES"
+    for f in "$SNES_PERSIST_SAVES"/*.srm; do
+        [ -f "$f" ] || continue
+        base="$(basename "$f")"
+        cp -f "$f" "${SNES_SHM_SAVES}/${base}"
+    done
+}
 
-        log_info "Flushing RAM caches to ${SHARE_MOUNT}..."
-        pack_dir_atomic "/dev/shm/emu_cache" "${STAGE_DIR}/emu_cache.tar.zst"
-        pack_dir_atomic "/dev/shm/pgo"       "${STAGE_DIR}/pgo.tar.zst"
-        pack_dir_atomic "/dev/shm/nv_cache"  "${STAGE_DIR}/nv_cache.tar.zst"
+flush_all() {
+    sync_dir_atomic "$SNES_SHM_SAVES" "$SNES_PERSIST_SAVES"
+}
 
-        sync
+case "${1:-save}" in
+    start|stage)
+        stage_snes_saves
         ;;
-    start)
-        # Optional restore hook if archives exist and target /dev/shm dirs are empty
-        if is_share_mounted && command -v zstd >/dev/null 2>&1; then
-            for item in "emu_cache:/dev/shm/emu_cache" "pgo:/dev/shm/pgo" "nv_cache:/dev/shm/nv_cache"; do
-                name="${item%%:*}"
-                dst="${item#*:}"
-                arc="${STAGE_DIR}/${name}.tar.zst"
-                mkdir -p "$dst"
-                if [ -f "$arc" ] && [ -z "$(ls -A "$dst" 2>/dev/null || true)" ]; then
-                    zstd -dc -q "$arc" 2>/dev/null | tar -C "$dst" -xf - 2>/dev/null || true
-                fi
-            done
-        fi
+    save|stop|flush)
+        flush_all
+        ;;
+    status)
+        echo "SHM saves: $(ls -1 "$SNES_SHM_SAVES" 2>/dev/null | wc -l) files"
+        echo "Persistent saves: $(ls -1 "$SNES_PERSIST_SAVES" 2>/dev/null | wc -l) files"
         ;;
     *)
-        echo "Usage: $0 {start|stop}"
-        exit 1
+        echo "Usage: $0 {start|stage|save|stop|flush|status}" >&2
+        exit 2
         ;;
 esac
 
