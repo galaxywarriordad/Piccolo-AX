@@ -24,9 +24,13 @@ FLYCAST_AX_DEPENDENCIES = \
 	libzip \
 	zlib
 
+FLYCAST_AX_AX_FLAGS = -march=skylake -mbmi -mbmi2 -O3 -flto=thin -ffile-prefix-map=$(@D)=. -ffile-prefix-map=$(BR2_EXTERNAL_PICCOLO_AX_PATH)=.
+
 FLYCAST_AX_CONF_OPTS = \
 	-DCMAKE_BUILD_TYPE=Release \
-	-DCMAKE_CXX_FLAGS="$(TARGET_CXXFLAGS) -march=skylake -O3" \
+	-DCMAKE_C_FLAGS="$(TARGET_CFLAGS) $(FLYCAST_AX_AX_FLAGS)" \
+	-DCMAKE_CXX_FLAGS="$(TARGET_CXXFLAGS) $(FLYCAST_AX_AX_FLAGS)" \
+	-DCMAKE_EXE_LINKER_FLAGS="$(TARGET_LDFLAGS) -flto=thin -Wl,--build-id=sha1" \
 	-DAX_FETCH_SDK=OFF \
 	-DAX_SDK_DIR=$(STAGING_DIR)/usr \
 	-DAX_BUILD_RMG=OFF \
@@ -45,6 +49,10 @@ FLYCAST_AX_CONF_OPTS = \
 	-DUSE_BREAKPAD=OFF \
 	-DUSE_HOST_SDL=ON \
 	-DENABLE_CTEST=OFF
+
+define FLYCAST_AX_BUILD_CMDS
+	$(TARGET_MAKE_ENV) $(MAKE) -j4 -C $(@D)/build
+endef
 
 define FLYCAST_AX_INSTALL_TARGET_CMDS
 	$(INSTALL) -D -m 0755 $(@D)/engines/flycast/flycast $(TARGET_DIR)/usr/bin/flycast
