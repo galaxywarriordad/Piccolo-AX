@@ -6,9 +6,9 @@ The **AX Project** separates shared low-level C++20 silicon abstractions (`ax-sd
 
 ```
          +-------------------------------------------------------+
-         |                   ax-sdk (v1_36_2)                    |
-         |     (https://github.com/galaxywarriordad/ax-sdk)      |
-         | Shared C++20 Silicon Core, Dynamic SMT/CCX & 1:2:1    |
+         |                   ax-sdk (v1_36_2)                  |
+         |        (https://github.com/galaxywarriordad/ax-sdk)       |
+         | Shared C++20 Silicon Core, Dynamic SMT/CCX & 1:2:1   |
          |   Topology, Platform Shims, Telemetry & Master Specs  |
          +-------------------------------------------------------+
           /             /                       \                 \
@@ -73,7 +73,8 @@ The **AX Project** separates shared low-level C++20 silicon abstractions (`ax-sd
   * **Cores `0–4`:** Isolated domain (`isolcpus=managed_irq,domain,0-4`, `nohz_full=0-4`, `rcu_nocbs=0-4`, and cgroup v2 `eden.slice` `cpuset.cpus=0-4`), with Core `0` (`0x01`) hosting low-latency USB DAC / xHCI MSI IRQs, real-time audio (`SCHED_FIFO` priority `80`), and `AlsaStereoSink` consumers, and Core `1` (`0x02`) hosting NVIDIA GPU (`GTX 980 Ti` / `580.*` legacy branch) MSI IRQs.  
   * **Core `5` (`0x20`):** Quarantined target for unbound kernel workqueues, default SMP IRQ affinity, `512 MB` LZ4 `zram0` swap (`swapon -p 100`), and asynchronous `SwitchHDD` mounting.  
 * **RAM-Resident Caches & Atomic Exit Persistence (`K01piccolo-sync`):** Emulator caches, PGO profiles, and NVIDIA caches stage in `/dev/shm/emu_cache`, `/dev/shm/pgo`, and `/dev/shm/nv_cache` during runtime and flush atomically (`.tmp.$$` \-\> `.tar.zst`) to `/userdata/system/ax-sync/` on shutdown/stop.  
-* **Exclusive DAC Locking (`/run/lock/ax-dac.lock`):** Serializes real-time access to `hw:CARD=FC3,DEV=0` (HiBy FC3 / ESS DAC) via `ScopedDacLock` (`flock` on open descriptor without unlink race on teardown) and `flock -n` in `ax-mode-cli` across `audio` (`flac_ax`, `ax_av_studio`, `ax_clap_host`, `ax_lv2_host`) and `upscaler` (`ax_video_upscaler`) modes.
+* **Exclusive DAC Locking (`/run/lock/ax-dac.lock`):** Serializes real-time access to `hw:CARD=FC3,DEV=0` (HiBy FC3 / ESS DAC) via `ScopedDacLock` (`flock` on open descriptor without unlink race on teardown) and `flock -n` in `ax-mode-cli` across `audio` (`flac_ax`, `ax_av_studio`, `ax_clap_host`, `ax_lv2_host`) and `upscaler` (`ax_video_upscaler`) modes.  
+* **Single-Mode Boot & Reboot-to-Switch Workflow:** Operating mode is selected at boot in Limine via `ax.mode=retro`, `audio`, `upscaler`, or `desktop`. Major workload or desktop transitions require a reboot so each session launches on a clean, uncontended hardware slate. Irreplaceable state—game saves, SRAM, presets, and configs—is written directly to `/userdata` (`SHARE`) via atomic temporary file creation, `fsync`, and rename operations at mutation time rather than relying on shutdown hooks, while `/dev/shm` (`emu_cache`, `pgo`, `nv_cache`) remains strictly ephemeral, regenerable cache.
 
 ---
 
@@ -523,13 +524,14 @@ exit 0
 
 ```sh
 #!/bin/sh
-# K01piccolo-sync — Atomic RAM tmpfs (/dev/shm) -> SHARE persistence on stop/shutdown
+# K01piccolo-sync — Hardened tmpfs (/dev/shm) -> SHARE persistence using ax-fsync
 
 set -u
 
 SHARE_MOUNT="/userdata"
 STAGE_DIR="${SHARE_MOUNT}/system/ax-sync"
 LOG_TAG="[Piccolo-AX sync]"
+RESERVE_KB=65536
 
 log_info() {
   echo "${LOG_TAG} $*"
@@ -543,22 +545,35 @@ is_share_mounted() {
   grep -qs "[[:space:]]${SHARE_MOUNT}[[:space:]]" /proc/mounts
 }
 
-# Pack a source directory into an atomic .tar.zst archive on SHARE
+do_fsync() {
+  target="$1"
+  if command -v ax-fsync >/dev/null 2>&1; then
+    ax-fsync "$target" >/dev/null 2>&1 || sync
+  else
+    sync
+  fi
+}
+
 pack_dir_atomic() {
   src_dir="$1"
   dest_tar="$2"
 
-  if [ ! -d "$src_dir" ]; then
+  if [ ! -d "$src_dir" ] || [ -z "$(ls -A "$src_dir" 2>/dev/null || true)" ]; then
     return 0
   fi
 
-  # Skip empty directories so we avoid unnecessary flash writes
-  if [ -z "$(ls -A "$src_dir" 2>/dev/null || true)" ]; then
+  src_size_kb=$(du -sk "$src_dir" 2>/dev/null | awk '{print $1}')
+  required_kb=$(( (src_size_kb * 125 / 100) + RESERVE_KB ))
+  avail_kb=$(df -kP "$SHARE_MOUNT" 2>/dev/null | awk 'NR==2 {print $4}')
+
+  if [ "${avail_kb:-0}" -lt "$required_kb" ]; then
+    log_warn "Insufficient space on ${SHARE_MOUNT} (${avail_kb:-0} KB avail vs ${required_kb} KB required); skipping '$src_dir'"
     return 0
   fi
 
   mkdir -p "$(dirname "$dest_tar")"
   tmp_tar="${dest_tar}.tmp.$$"
+  prev_tar="${dest_tar}.prev"
 
   if command -v zstd >/dev/null 2>&1; then
     tar -C "$src_dir" -cf - . 2>/dev/null | zstd -3 -T0 -q -o "$tmp_tar" 2>/dev/null || {
@@ -575,7 +590,17 @@ pack_dir_atomic() {
   fi
 
   if [ -s "$tmp_tar" ]; then
+    if command -v zstd >/dev/null 2>&1 && echo "$dest_tar" | grep -q '\.zst$'; then
+      if ! zstd -t -q "$tmp_tar" 2>/dev/null; then
+        log_warn "Archive validation failed for '$tmp_tar'; discarding corrupt output."
+        rm -f "$tmp_tar"
+        return 0
+      fi
+    fi
+    do_fsync "$tmp_tar"
+    [ -f "$dest_tar" ] && cp -f "$dest_tar" "$prev_tar" 2>/dev/null || true
     mv -f "$tmp_tar" "$dest_tar"
+    do_fsync "$(dirname "$dest_tar")"
     log_info "Flushed '$src_dir' -> '$dest_tar' ($(du -h "$dest_tar" 2>/dev/null | awk '{print $1}'))"
   else
     rm -f "$tmp_tar"
@@ -583,32 +608,42 @@ pack_dir_atomic() {
 }
 
 case "${1:-}" in
+  start)
+    if is_share_mounted; then
+      rm -f "${STAGE_DIR}"/*.tmp.* 2>/dev/null || true
+      if command -v zstd >/dev/null 2>&1; then
+        for item in "emu_cache:/dev/shm/emu_cache" "pgo:/dev/shm/pgo" "nv_cache:/dev/shm/nv_cache"; do
+          name="${item%%:*}"
+          dst="${item#*:}"
+          arc="${STAGE_DIR}/${name}.tar.zst"
+          prev="${arc}.prev"
+          mkdir -p "$dst"
+          if [ -z "$(ls -A "$dst" 2>/dev/null || true)" ]; then
+            target_arc=""
+            if [ -f "$arc" ] && zstd -t -q "$arc" 2>/dev/null; then
+              target_arc="$arc"
+            elif [ -f "$prev" ] && zstd -t -q "$prev" 2>/dev/null; then
+              log_warn "Primary archive '$arc' corrupt; falling back to '$prev'"
+              target_arc="$prev"
+            fi
+            if [ -n "$target_arc" ]; then
+              zstd -dc -q "$target_arc" 2>/dev/null | tar -C "$dst" -xf - 2>/dev/null || true
+            fi
+          fi
+        done
+      fi
+    fi
+    ;;
   stop)
     if ! is_share_mounted; then
       log_warn "'${SHARE_MOUNT}' is not mounted; skipping RAM cache flush."
       exit 0
     fi
-
     log_info "Flushing RAM caches to ${SHARE_MOUNT}..."
     pack_dir_atomic "/dev/shm/emu_cache" "${STAGE_DIR}/emu_cache.tar.zst"
     pack_dir_atomic "/dev/shm/pgo" "${STAGE_DIR}/pgo.tar.zst"
     pack_dir_atomic "/dev/shm/nv_cache" "${STAGE_DIR}/nv_cache.tar.zst"
-
-    sync
-    ;;
-  start)
-    # Optional restore hook if archives exist and target /dev/shm dirs are empty
-    if is_share_mounted && command -v zstd >/dev/null 2>&1; then
-      for item in "emu_cache:/dev/shm/emu_cache" "pgo:/dev/shm/pgo" "nv_cache:/dev/shm/nv_cache"; do
-        name="${item%%:*}"
-        dst="${item#*:}"
-        arc="${STAGE_DIR}/${name}.tar.zst"
-        mkdir -p "$dst"
-        if [ -f "$arc" ] && [ -z "$(ls -A "$dst" 2>/dev/null || true)" ]; then
-          zstd -dc -q "$arc" 2>/dev/null | tar -C "$dst" -xf - 2>/dev/null || true
-        fi
-      done
-    fi
+    do_fsync "$STAGE_DIR"
     ;;
   *)
     echo "Usage: $0 {start|stop}"
@@ -876,6 +911,38 @@ if [ -n "${EROFS_PATH}" ]; then
   fi
 else
   echo "[WARN] 7. rootfs.erofs not mounted at /boot/rootfs.erofs or /boot/boot/rootfs.erofs"
+fi
+
+# 8. PCI Vendor/Device ID Gate & SMT/Hyper-Threading Check
+APPROVED_NV=("10de:17c8" "10de:13c0" "10de:13c2")
+APPROVED_INTEL=("8086:3e92" "8086:3e98" "8086:9bc5" "8086:4c8a")
+PCI_FOUND=0
+for dev in /sys/bus/pci/devices/*; do
+  if [ -r "$dev/vendor" ] && [ -r "$dev/device" ]; then
+    ven=$(cat "$dev/vendor" | sed 's/^0x//')
+    id=$(cat "$dev/device" | sed 's/^0x//')
+    pair="${ven}:${id}"
+    for app in "${APPROVED_NV[@]}" "${APPROVED_INTEL[@]}"; do
+      if [ "$pair" = "$app" ]; then PCI_FOUND=1; break 2; fi
+    done
+  fi
+done
+if [ "$PCI_FOUND" -eq 1 ]; then
+  echo "[PASS] 8a. Approved PCI GPU hardware detected"
+else
+  echo "[WARN] 8a. No matched PCI GPU vendor/device ID in allowlist"
+fi
+
+if [ -r /sys/devices/system/cpu/smt/active ]; then
+  SMT_ACT=$(cat /sys/devices/system/cpu/smt/active)
+  if [ "$SMT_ACT" = "0" ]; then
+    echo "[PASS] 8b. Hyper-Threading / SMT disabled (smt/active=0)"
+  else
+    echo "[FAIL] 8b. Hyper-Threading / SMT is active (smt/active=${SMT_ACT})"
+    FAIL=1
+  fi
+else
+  echo "[WARN] 8b. /sys/devices/system/cpu/smt/active unavailable"
 fi
 
 echo "============================================================"
