@@ -3,17 +3,29 @@
 #include "ui/ax_retro_chrome.hpp"
 #include "ui/ax_retro_font.hpp"
 
+#include <algorithm>
 #include <csignal>
 #include <iostream>
 #include <string>
 
 namespace {
+
 volatile std::sig_atomic_t g_stop_flag = 0;
 
 void HandleSignal(int signum) {
     (void)signum;
     g_stop_flag = 1;
 }
+
+int ParseScanlinesArg(const std::string& raw) {
+    try {
+        const int parsed = std::stoi(raw);
+        return std::clamp(parsed, 0, 100);
+    } catch (...) {
+        return 25;
+    }
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -31,7 +43,7 @@ int main(int argc, char** argv) {
         } else if (arg == "--no-retro-chrome") {
             retro_chrome = false;
         } else if (arg == "--scanlines" && i + 1 < argc) {
-            scanline_pct = std::stoi(argv[++i]);
+            scanline_pct = ParseScanlinesArg(argv[++i]);
         }
     }
 
@@ -53,8 +65,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // Example Core 1 / HUD staging buffer usage (kept off Core 0 audio & Cores 2-4 emu)
-    if (retro_chrome && scanline_pct >= 0) {
+    if (retro_chrome) {
         std::cout << "[genx-snes-ax] Piccolo-AX retro UI active (scanlines="
                   << scanline_pct << "%)\n";
     }
@@ -69,5 +80,6 @@ int main(int argc, char** argv) {
         std::cerr << "[genx-snes-ax] Save flush or DAC lock release warning\n";
         return 1;
     }
+
     return 0;
 }
