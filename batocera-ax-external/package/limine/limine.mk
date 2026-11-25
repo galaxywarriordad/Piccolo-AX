@@ -10,7 +10,7 @@ LIMINE_SOURCE = limine-$(LIMINE_VERSION).tar.xz
 LIMINE_LICENSE = BSD-2-Clause
 
 define LIMINE_BUILD_CMDS
-	$(MAKE) -C $(@D) CC="$(HOSTCC)" limine
+	$(HOST_MAKE_ENV) $(MAKE) -j4 -C $(@D) CC="$(HOSTCC)" limine
 endef
 
 define LIMINE_INSTALL_TARGET_CMDS
