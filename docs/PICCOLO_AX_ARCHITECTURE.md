@@ -5,15 +5,16 @@
 The **AX Project** separates shared low-level C++20 silicon abstractions (`ax-sdk`) from platform-, emulator-, and workbench-specific repositories so upstream rebases stay clean while hardware isolation logic remains unified across Windows 10/11, bare-metal `x86_64` Linux, and `aarch64` handhelds.
 
 ```
-                      +-------------------------------------------------------+
-                      |                   ax-sdk (v1_36_2)                    |
-                      |   (https://github.com/galaxywarriordad/ax-sdk)        |
-                      | Shared C++20 Silicon Core, Dynamic SMT/CCX & 1:2:1    |
-                      | Topology, Platform Shims, Telemetry & Master Specs    |
-                      +-------------------------------------------------------+
-                            /             /               \             \
-              FetchContent / FetchContent/                 \ FetchContent\ BR2_EXTERNAL
-                          v             v                   v             v
+         +-------------------------------------------------------+
+         |                   ax-sdk (v1_36_2)                  |
+         |        (https://github.com/galaxywarriordad/ax-sdk)       |
+         | Shared C++20 Silicon Core, Dynamic SMT/CCX & 1:2:1   |
+         |   Topology, Platform Shims, Telemetry & Master Specs  |
+         +-------------------------------------------------------+
+          /             /                       \                 \
+  FetchContent   FetchContent/           FetchContent\         BR2_EXTERNAL
+        /               /                             \                 \
+       v               v                               v                 v
 +-----------------------+ +-------------------+ +------------------+ +-----------------------+
 | Eden-Espresso-Wave-AX | | Cemu-Latte-AX     | | Amiberry-AX      | | Generation-X-AX       |
 | (Forgejo — Switch)    | | (GitHub — Wii U)  | | (GitHub — Amiga) | | (GitHub — 7 Classics) |
@@ -21,43 +22,43 @@ The **AX Project** separates shared low-level C++20 silicon abstractions (`ax-sd
 | LLVM 23 PGO, QSV      | | Powered by ax     | | Powered by ax    | | EDuke32, Frontier,    |
 |                       | |                   | |                  | | Flycast & Hatari      |
 +-----------------------+ +-------------------+ +------------------+ +-----------------------+
-                                               |                              
-                       +-----------------------+-----------------------+
-                       |                       |                       |
-                       v                       v                       v
-        +-----------------------+ +-------------------+ +---------------------------------------+
-        | Piccolo-2go           | | Piccolo-AX        | | FLAC_AX                               |
-        | (GitHub — ARM64 OS)   | | (GitHub — x86 OS) | | (GitHub — A/V Studio & ESS Audio)     |
-        | RK3326 1:2:1 Handheld | | < 512 MB toram    | | flac_ax (S32_LE) + ax_av_studio (HUD) |
-        | BATLEXP G350 & R36S   | | 6.12-rt Appliance | +---------------------------------------+
-        +-----------------------+ +---------+---------+
-                                            | Optional BR2_EXTERNAL Layer
-                                            v
-                                  +-------------------+
-                                  |piccolo-ax-desktop |
-                                  | (GitHub — <42 MB) |
-                                  | C/C++ Workbench   |
-                                  +-------------------+
+                                                                         |
+                               +-----------------------+-----------------+
+                               |                       |
+                               v                       v
+                   +-------------------+   +-------------------+   +---------------------------------------+
+                   | Piccolo-2go       |   | Piccolo-AX        |   | FLAC_AX                               |
+                   | (GitHub — ARM64 OS|   | (GitHub — x86 OS) |   | (GitHub — A/V Studio, Hosts & ESS DAC)|
+                   | RK3326 1:2:1      |   | < 512 MB toram    |   | flac_ax, ax_clap_host, ax_lv2_host,   |
+                   | BATLEXP G350/R36S |   | 6.12-rt Appliance |   | ax_av_studio, ax_video_upscaler, TUI  |
+                   +-------------------+   +---------+---------+   +---------------------------------------+
+                                                     |
+                                                     v
+                                           +-------------------+
+                                           | piccolo-ax-desktop|
+                                           | (GitHub — <42 MB) |
+                                           | C/C++ Workbench   |
+                                           +-------------------+
 ```
 
 ### Repository Breakdown & Lineage (All 9 Repositories)
 
 | Repository | Host & Canonical URL | Primary Role & Lineage |
 | :---- | :---- | :---- |
-| **`ax-sdk`** | **GitHub:** `galaxywarriordad/ax-sdk` | Shared, zero-dependency C++20 silicon library (`libax_core` / `ax::core`, `v1_36_2`), dynamic Intel SMT / AMD CCX / `RK3326` `1:2:1` topology resolver, Win32/Linux platform shims, and cross-project master specs. |
-| **`Eden-Espresso-Wave-AX`** | **Forgejo:** `galaxywarriordad/Eden-Espresso-Wave-AX` | **Windows 10/11 Switch Engine Master** — Direct fork of upstream Eden hosted on Forgejo for frictionless PR cherry-picks; features LLVM `clang-cl` 23+ 3-stage PGO, FlexASIO/WASAPI Exclusive audio, Intel QSV offload, and Maxwell GM200 VRAM shields. |
-| **`Piccolo-AX`** | **GitHub:** `galaxywarriordad/Piccolo-AX` | **Batocera Linux Branch of `Eden-Espresso-Wave-AX`** — Adapts the Espresso Wave `[AX]` engine for bare-metal Linux (`Linux 6.12-rt`, direct ALSA `SCHED_FIFO`, `iHD` VA-API `dma_buf`) and packages all `[AX]` engines and studios via `batocera-ax-external/` into a `< 512 MB` `toram` EROFS USB 3.0 console appliance. |
-| **`Piccolo-2go`** | **GitHub:** `galaxywarriordad/Piccolo-2go` | **Deterministic `aarch64` Buildroot Handheld OS** — `< 140 MB` `zstd` SquashFS for **BATLEXP G350** & **R36S** (`RK3326`, `1:2:1` isolation, `1024 MB LZ4` ZRAM, `Panfrost` KMS/DRM, dual SanDisk `SDR50` guard, and **HiBy FC3 `1.3 Vrms`** OTG audio). |
-| **`Generation-X-AX`** | **GitHub:** `galaxywarriordad/Generation-X-AX` | **Unified Classic Engines `[AX]` Suite** — Consolidates 7 classic 1985–1998 engines (`RMG` N64, `BlastEm` Mega Drive, `Cannonball` OutRun, `EDuke32`, `Frontier: Elite II`, `Flycast` Dreamcast/NAOMI, and `Hatari` Atari ST) behind `ax_retro_bridge` (`ax::core`). |
-| **`Cemu-Latte-AX`** | **GitHub:** `galaxywarriordad/Cemu-Latte-AX` | **Nintendo Wii U (Latte GPU) AX Fork** — Integrates `ax::core` for deterministic physical-core isolation, MMCSS/ALSA audio prioritization, and hardware IRQ/VRAM discipline across Windows 10/11 and `Piccolo-AX`. |
-| **`Amiberry-AX`** | **GitHub:** `galaxywarriordad/Amiberry-AX` | **Commodore Amiga 500 / 1200 / CD32 AX Fork** — Integrates `ax::core` (`v1_36_2`) for cycle-consistent `50 Hz` PAL raster timing, `HugeTLB` fastmem, and Paula DMA audio isolation. |
-| **`piccolo-ax-desktop`** | **GitHub:** `galaxywarriordad/piccolo-ax-desktop` | **Optional `< 42 MB` Tier A C/C++ Desktop Workbench** — Pluggable `BR2_EXTERNAL` overlay providing `LXQt`/`XFCE`, `Falkon`, `GrafX2`, `LibreSprite`, `mtPaint`, `AzPainter`, `GHex`, and `CPU-X` with `SHARE` persistence. |
-| **`FLAC_AX`** | **GitHub:** `galaxywarriordad/FLAC_AX` | **Deterministic `[AX]` Audio/Visual Studio & ESS Sabre Appliance** — Combines bit-perfect `44.1–384 kHz` `S32_LE` playback (`flac_ax`) with a live `2.00 ms` 16-voice polyphonic synthesizer, Akai MPK Mini MK3 ALSA RawMIDI controller, and VBlank OpenGL FFT/oscilloscope HUD (`ax_av_studio`). |
+| **ax-sdk** | **GitHub:** `galaxywarriordad/ax-sdk` | Shared, zero-dependency C++20 silicon library (`libax_core` / `ax::core`, `v1_36_2`), dynamic Intel SMT / AMD CCX / `RK3326` `1:2:1` topology resolver, Win32/Linux platform shims, and cross-project master specs. |
+| **Eden-Espresso-Wave-AX** | **Forgejo:** `galaxywarriordad/Eden-Espresso-Wave-AX` | **Windows 10/11 Switch Engine Master** — Direct fork of upstream Eden hosted on Forgejo for frictionless PR cherry-picks; features LLVM `clang-cl` 23+ 3-stage PGO, FlexASIO/WASAPI Exclusive audio, Intel QSV offload, and Maxwell GM200 VRAM shields. |
+| **Piccolo-AX** | **GitHub:** `galaxywarriordad/Piccolo-AX` | **Batocera Linux Branch of `Eden-Espresso-Wave-AX`** — Adapts the Espresso Wave `[AX]` engine for bare-metal Linux (`Linux 6.12-rt`, direct ALSA `SCHED_FIFO`, `iHD` VA-API `dma_buf`) and packages all `[AX]` engines and studios via `batocera-ax-external/` into a `< 512 MB` `toram` EROFS USB 3.0 console appliance. |
+| **Piccolo-2go** | **GitHub:** `galaxywarriordad/Piccolo-2go` | **Deterministic `aarch64` Buildroot Handheld OS** — `< 140 MB` `zstd` SquashFS for **BATLEXP G350** & **R36S** (`RK3326`, `1:2:1` isolation, `1024 MB LZ4` ZRAM, `Panfrost` KMS/DRM, dual SanDisk `SDR50` guard, and **HiBy FC3 `1.3 Vrms`** OTG audio). |
+| **Generation-X-AX** | **GitHub:** `galaxywarriordad/Generation-X-AX` | **Unified Classic Engines `[AX]` Suite** — Consolidates 7 classic 1985–1998 engines (`RMG` N64, `BlastEm` Mega Drive, `Cannonball` OutRun, `EDuke32`, `Frontier: Elite II`, `Flycast` Dreamcast/NAOMI, and `Hatari` Atari ST) behind `ax_retro_bridge` (`ax::core`). |
+| **Cemu-Latte-AX** | **GitHub:** `galaxywarriordad/Cemu-Latte-AX` | **Nintendo Wii U (Latte GPU) AX Fork** — Integrates `ax::core` for deterministic physical-core isolation, MMCSS/ALSA audio prioritization, and hardware IRQ/VRAM discipline across Windows 10/11 and `Piccolo-AX`. |
+| **Amiberry-AX** | **GitHub:** `galaxywarriordad/Amiberry-AX` | **Commodore Amiga 500 / 1200 / CD32 AX Fork** — Integrates `ax::core` (`v1_36_2`) for cycle-consistent `50 Hz` PAL raster timing, `HugeTLB` fastmem, and Paula DMA audio isolation. |
+| **piccolo-ax-desktop** | **GitHub:** `galaxywarriordad/piccolo-ax-desktop` | **Optional `< 42 MB` Tier A C/C++ Desktop Workbench** — Pluggable `BR2_EXTERNAL` overlay providing `LXQt`/`XFCE`, `Falkon`, `GrafX2`, `LibreSprite`, `mtPaint`, `AzPainter`, `GHex`, and `CPU-X` with `SHARE` persistence. |
+| **FLAC\_AX** | **GitHub:** `galaxywarriordad/FLAC_AX` | **Deterministic `[AX]` Audio/Visual Studio, Plugin Hosts & ESS Sabre Appliance** — Combines bit-perfect `44.1–384 kHz` `S32_LE` / `DoP` / tracker playback (`flac_ax`) with cross-platform CLAP (`ax_clap_host`) and LV2 (`ax_lv2_host`) plugin hosts draining via `StereoSampleRing` and `AlsaStereoSink` (`S32_LE`), RAII `ScopedDacLock` (`/run/lock/ax-dac.lock`), a live `2.00 ms` 16-voice polyphonic synthesizer, Akai MPK Mini MK3 ALSA RawMIDI controller, VBlank OpenGL FFT/oscilloscope HUD (`ax_av_studio`), 720p/1080p/2K upscaler (`ax_video_upscaler`), and Core `5` appliance TUI (`ax_appliance_tui`). |
 
 ### Cross-Repository Dependency & Merge Flow
 
-* **Shared Silicon Core (`ax-sdk`):** `Eden-Espresso-Wave-AX`, `Piccolo-AX`, `Piccolo-2go`, `Cemu-Latte-AX`, `Amiberry-AX`, `Generation-X-AX`, and `FLAC_AX` all consume `ax-sdk` (`v1.36.2`) as a pinned CMake dependency (`ax::core`), inheriting identical core-pinning, `LockFreeStereoRing` audio buffers, and `/dev/shm/ax_telemetry` jitter counters without duplicating C++20 code.  
-* **Unified Appliance Assembly (`Piccolo-AX`):** `batocera-ax-external/` pulls `Eden-Espresso-Wave-AX`, `Cemu-Latte-AX`, `Amiberry-AX`, all `Generation-X-AX` engine targets, and `FLAC_AX` (`flac_ax` \+ `ax_av_studio`, coordinated via `/run/lock/ax-dac.lock` DAC handoff) into a single immutable `rootfs.erofs` image—with optional `piccolo-ax-desktop` workbench layering enabled via `BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH`.
+* **Shared Silicon Core (`ax-sdk`):** `Eden-Espresso-Wave-AX`, `Piccolo-AX`, `Piccolo-2go`, `Cemu-Latte-AX`, `Amiberry-AX`, `Generation-X-AX`, and `FLAC_AX` all consume `ax-sdk` (`v1.36.2`) as a pinned CMake dependency (`ax::core`), inheriting identical core-pinning, ring buffer transport, and `/dev/shm/ax_telemetry` jitter counters without duplicating C++20 code.  
+* **Unified Appliance Assembly (`Piccolo-AX`):** `batocera-ax-external/` pulls `Eden-Espresso-Wave-AX`, `Cemu-Latte-AX`, `Amiberry-AX`, all `Generation-X-AX` engine targets, and `FLAC_AX` (`flac_ax`, `ax_clap_host`, `ax_lv2_host`, `ax_av_studio`, `ax_video_upscaler`, and `ax_appliance_tui`, coordinated via `/run/lock/ax-dac.lock` DAC handoff) into a single immutable `rootfs.erofs` image—with optional `piccolo-ax-desktop` workbench layering enabled via `BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH`.
 
 ---
 
@@ -69,10 +70,10 @@ The **AX Project** separates shared low-level C++20 silicon abstractions (`ax-sd
 * **Journal-Free `ext4` `SHARE` Partition (`-O ^has_journal`):** Mounted on `/userdata` to eliminate ext4 journal write amplification on Samsung FIT Plus (`64 GB` `MUF-64AB/APC` and `128 GB`) USB flash storage.  
 * **First-Boot Dynamic Expansion (`ax-grow-share.sh`):** Keeps the build-time image compact (`4096 MiB` `BATOCERA` FAT32 \+ `2048 MiB` default `SHARE` ext4) so a single flash image works across both `64 GB` and `128 GB` drives, then relocates the GPT backup header (`sgdisk -e`), grows partition 2 to `100%`, and expands the `ext4` filesystem (`resize2fs`) on first boot.  
 * **CPU Core Isolation & IRQ Pinning:**  
-  * **Cores `0–4`:** Isolated domain (`isolcpus=managed_irq,domain,0-4`, `nohz_full=0-4`, `rcu_nocbs=0-4`, and cgroup v2 `eden.slice` `cpuset.cpus=0-4`), with Core `0` (`0x01`) hosting low-latency USB DAC / xHCI MSI IRQs and real-time audio (`SCHED_FIFO` priority `80`) and Core `1` (`0x02`) hosting NVIDIA GPU (`GTX 980 Ti` / `580.*` legacy branch) MSI IRQs.  
+  * **Cores `0–4`:** Isolated domain (`isolcpus=managed_irq,domain,0-4`, `nohz_full=0-4`, `rcu_nocbs=0-4`, and cgroup v2 `eden.slice` `cpuset.cpus=0-4`), with Core `0` (`0x01`) hosting low-latency USB DAC / xHCI MSI IRQs, real-time audio (`SCHED_FIFO` priority `80`), and `AlsaStereoSink` consumers, and Core `1` (`0x02`) hosting NVIDIA GPU (`GTX 980 Ti` / `580.*` legacy branch) MSI IRQs.  
   * **Core `5` (`0x20`):** Quarantined target for unbound kernel workqueues, default SMP IRQ affinity, `512 MB` LZ4 `zram0` swap (`swapon -p 100`), and asynchronous `SwitchHDD` mounting.  
 * **RAM-Resident Caches & Atomic Exit Persistence (`K01piccolo-sync`):** Emulator caches, PGO profiles, and NVIDIA caches stage in `/dev/shm/emu_cache`, `/dev/shm/pgo`, and `/dev/shm/nv_cache` during runtime and flush atomically (`.tmp.$$` \-\> `.tar.zst`) to `/userdata/system/ax-sync/` on shutdown/stop.  
-* **Exclusive DAC Locking (`/run/lock/ax-dac.lock`):** Serializes real-time access to `hw:CARD=FC3,DEV=0` (HiBy FC3 / ESS DAC) via `flock -n` in `ax-mode-cli` across `audio` (`flac_ax`, `ax_av_studio`) and `upscaler` (`ax_video_upscaler`) modes.
+* **Exclusive DAC Locking (`/run/lock/ax-dac.lock`):** Serializes real-time access to `hw:CARD=FC3,DEV=0` (HiBy FC3 / ESS DAC) via `ScopedDacLock` (`flock` on open descriptor without unlink race on teardown) and `flock -n` in `ax-mode-cli` across `audio` (`flac_ax`, `ax_av_studio`, `ax_clap_host`, `ax_lv2_host`) and `upscaler` (`ax_video_upscaler`) modes.
 
 ---
 
@@ -136,15 +137,15 @@ else
   echo "[Piccolo-AX] Installing piccolo-ax-desktop workbench launchers..."
   install -d -m 0755 "${TARGET_DIR}/etc/profile.d" "${TARGET_DIR}/usr/local/bin"
   install -m 0644 "${DESKTOP_REPO}/overlays/common/etc/profile.d/ax-desktop-xdg.sh" \
-    "${TARGET_DIR}/etc/profile.d/ax-desktop-xdg.sh"
+                 "${TARGET_DIR}/etc/profile.d/ax-desktop-xdg.sh"
   install -m 0755 "${DESKTOP_REPO}/scripts/launch-desktop.sh" \
-    "${TARGET_DIR}/usr/local/bin/launch-desktop.sh"
+                 "${TARGET_DIR}/usr/local/bin/launch-desktop.sh"
   install -m 0755 "${DESKTOP_REPO}/scripts/launch-falkon.sh" \
-    "${TARGET_DIR}/usr/local/bin/launch-falkon.sh"
+                 "${TARGET_DIR}/usr/local/bin/launch-falkon.sh"
   install -m 0755 "${DESKTOP_REPO}/scripts/stage-share-apps.sh" \
-    "${TARGET_DIR}/usr/local/bin/stage-share-apps.sh"
+                 "${TARGET_DIR}/usr/local/bin/stage-share-apps.sh"
   install -m 0755 "${DESKTOP_REPO}/scripts/launch-mtpaint.sh" \
-    "${TARGET_DIR}/usr/local/bin/mtpaint"
+                 "${TARGET_DIR}/usr/local/bin/mtpaint"
 fi
 
 # 4. Ensure init hooks & scripts are executable
@@ -270,34 +271,34 @@ default_entry: 3
 remember_last_entry: yes
 
 /Retro & Console [Eden / Cemu / Generation-X]
-    protocol: linux
-    path: boot():/boot/bzImage
-    module_path: boot():/boot/initrd.lz4
-    cmdline: root=/dev/ram0 toram isolcpus=managed_irq,domain,0-4 nohz_full=0-4 rcu_nocbs=0-4 default_hugepagesz=1G hugepagesz=1G hugepages=6 hugepagesz=2M hugepages=1024 processor.max_cstate=0 skew_tick=1 pcie_aspm=off mitigations=off usbcore.autosuspend=-1 usbhid.jspoll=1 ax.mode=retro ax.dac_lock=/run/lock/ax-dac.lock piccolo.rootfs=rootfs.erofs
+  protocol: linux
+  path: boot():/boot/bzImage
+  module_path: boot():/boot/initrd.lz4
+  cmdline: root=/dev/ram0 toram isolcpus=managed_irq,domain,0-4 nohz_full=0-4 rcu_nocbs=0-4 default_hugepagesz=1G hugepagesz=1G hugepages=6 hugepagesz=2M hugepages=1024 processor.max_cstate=0 skew_tick=1 pcie_aspm=off mitigations=off usbcore.autosuspend=-1 usbhid.jspoll=1 ax.mode=retro ax.dac_lock=/run/lock/ax-dac.lock piccolo.rootfs=rootfs.erofs
 
-/Audio & Synth [flac_ax + ax_av_studio]
-    protocol: linux
-    path: boot():/boot/bzImage
-    module_path: boot():/boot/initrd.lz4
-    cmdline: root=/dev/ram0 toram isolcpus=managed_irq,domain,0-4 nohz_full=0-4 rcu_nocbs=0-4 default_hugepagesz=1G hugepagesz=1G hugepages=6 hugepagesz=2M hugepages=1024 processor.max_cstate=0 skew_tick=1 pcie_aspm=off mitigations=off usbcore.autosuspend=-1 usbhid.jspoll=1 ax.mode=audio ax.dac_lock=/run/lock/ax-dac.lock piccolo.rootfs=rootfs.erofs
+/Audio & Synth [flac_ax + ax_av_studio + CLAP/LV2]
+  protocol: linux
+  path: boot():/boot/bzImage
+  module_path: boot():/boot/initrd.lz4
+  cmdline: root=/dev/ram0 toram isolcpus=managed_irq,domain,0-4 nohz_full=0-4 rcu_nocbs=0-4 default_hugepagesz=1G hugepagesz=1G hugepages=6 hugepagesz=2M hugepages=1024 processor.max_cstate=0 skew_tick=1 pcie_aspm=off mitigations=off usbcore.autosuspend=-1 usbhid.jspoll=1 ax.mode=audio ax.dac_lock=/run/lock/ax-dac.lock piccolo.rootfs=rootfs.erofs
 
 /Video Upscaler [720p / 1080p / 2K]
-    protocol: linux
-    path: boot():/boot/bzImage
-    module_path: boot():/boot/initrd.lz4
-    cmdline: root=/dev/ram0 toram isolcpus=managed_irq,domain,0-4 nohz_full=0-4 rcu_nocbs=0-4 default_hugepagesz=1G hugepagesz=1G hugepages=6 hugepagesz=2M hugepages=1024 processor.max_cstate=0 skew_tick=1 pcie_aspm=off mitigations=off usbcore.autosuspend=-1 usbhid.jspoll=1 ax.mode=upscaler ax.dac_lock=/run/lock/ax-dac.lock piccolo.rootfs=rootfs.erofs
+  protocol: linux
+  path: boot():/boot/bzImage
+  module_path: boot():/boot/initrd.lz4
+  cmdline: root=/dev/ram0 toram isolcpus=managed_irq,domain,0-4 nohz_full=0-4 rcu_nocbs=0-4 default_hugepagesz=1G hugepagesz=1G hugepages=6 hugepagesz=2M hugepages=1024 processor.max_cstate=0 skew_tick=1 pcie_aspm=off mitigations=off usbcore.autosuspend=-1 usbhid.jspoll=1 ax.mode=upscaler ax.dac_lock=/run/lock/ax-dac.lock piccolo.rootfs=rootfs.erofs
 
 /Desktop Workbench [piccolo-ax-desktop]
-    protocol: linux
-    path: boot():/boot/bzImage
-    module_path: boot():/boot/initrd.lz4
-    cmdline: root=/dev/ram0 toram isolcpus=managed_irq,domain,0-4 nohz_full=0-4 rcu_nocbs=0-4 default_hugepagesz=1G hugepagesz=1G hugepages=6 hugepagesz=2M hugepages=1024 processor.max_cstate=0 skew_tick=1 pcie_aspm=off mitigations=off usbcore.autosuspend=-1 usbhid.jspoll=1 ax.mode=desktop piccolo.rootfs=rootfs.erofs
+  protocol: linux
+  path: boot():/boot/bzImage
+  module_path: boot():/boot/initrd.lz4
+  cmdline: root=/dev/ram0 toram isolcpus=managed_irq,domain,0-4 nohz_full=0-4 rcu_nocbs=0-4 default_hugepagesz=1G hugepagesz=1G hugepages=6 hugepagesz=2M hugepages=1024 processor.max_cstate=0 skew_tick=1 pcie_aspm=off mitigations=off usbcore.autosuspend=-1 usbhid.jspoll=1 ax.mode=desktop piccolo.rootfs=rootfs.erofs
 
 /Fallback A/B Retro [rootfs.erofs.prev]
-    protocol: linux
-    path: boot():/boot/bzImage
-    module_path: boot():/boot/initrd.lz4
-    cmdline: root=/dev/ram0 toram isolcpus=managed_irq,domain,0-4 nohz_full=0-4 rcu_nocbs=0-4 default_hugepagesz=1G hugepagesz=1G hugepages=6 hugepagesz=2M hugepages=1024 processor.max_cstate=0 skew_tick=1 pcie_aspm=off mitigations=off usbcore.autosuspend=-1 usbhid.jspoll=1 ax.mode=retro ax.dac_lock=/run/lock/ax-dac.lock piccolo.rootfs=rootfs.erofs.prev
+  protocol: linux
+  path: boot():/boot/bzImage
+  module_path: boot():/boot/initrd.lz4
+  cmdline: root=/dev/ram0 toram isolcpus=managed_irq,domain,0-4 nohz_full=0-4 rcu_nocbs=0-4 default_hugepagesz=1G hugepagesz=1G hugepages=6 hugepagesz=2M hugepages=1024 processor.max_cstate=0 skew_tick=1 pcie_aspm=off mitigations=off usbcore.autosuspend=-1 usbhid.jspoll=1 ax.mode=retro ax.dac_lock=/run/lock/ax-dac.lock piccolo.rootfs=rootfs.erofs.prev
 ```
 
 ### 4\. `batocera-ax-external/board/piccolo-ax/rootfs-overlay/usr/bin/ax-grow-share.sh`
@@ -684,7 +685,7 @@ fi
 while true; do
   clear
   echo "============================================================"
-  echo " Piccolo [AX] Bare-Metal Appliance — Mode: ${AX_MODE}"
+  echo "  Piccolo [AX] Bare-Metal Appliance — Mode: ${AX_MODE}"
   status_line
   echo "============================================================"
 
@@ -692,6 +693,8 @@ while true; do
     audio)
       echo "  1) flac_ax — Bit-Perfect FLAC / DSD RAM Transport"
       echo "  2) ax_av_studio — 2.00 ms Live Synth & FFT Studio"
+      echo "  3) ax_clap_host — CLAP Plugin Host (Core 2-4 DSP -> Core 0 S32_LE)"
+      echo "  4) ax_lv2_host — LV2 Plugin Host (Core 2-4 DSP -> Core 0 S32_LE)"
       echo "  v) Verify Appliance Hardware Gate"
       echo "  r) Reboot to Limine Boot Menu"
       printf "\nSelect option: "
@@ -703,6 +706,17 @@ while true; do
           ;;
         2)
           run_rt_dac /usr/bin/ax_av_studio --fullscreen --device "$DAC_DEV" --volume 0.80
+          ;;
+        3)
+          ensure_media_dir "/userdata/plugins"
+          printf "CLAP plugin path: "
+          read -r clap_path
+          [ -n "$clap_path" ] && run_rt_dac /usr/bin/ax_clap_host "$clap_path" "" 48000 96 --device "$DAC_DEV"
+          ;;
+        4)
+          printf "LV2 plugin URI: "
+          read -r lv2_uri
+          [ -n "$lv2_uri" ] && run_rt_dac /usr/bin/ax_lv2_host "$lv2_uri" 48000 96 --device "$DAC_DEV"
           ;;
         v|V)
           /usr/bin/verify_ax_appliance.sh
@@ -789,7 +803,7 @@ done
 set -euo pipefail
 
 echo "============================================================"
-echo " PICCOLO [AX] — BARE-METAL APPLIANCE HARDWARE VERIFICATION"
+echo "  PICCOLO [AX] — BARE-METAL APPLIANCE HARDWARE VERIFICATION"
 echo "============================================================"
 FAIL=0
 
