@@ -46,10 +46,13 @@ FLAC_AX_CONF_OPTS += -DFLAC_AX_ENABLE_OPENMPT=OFF
 endif
 
 FLAC_AX_DEPENDENCIES := $(sort $(FLAC_AX_DEPENDENCIES))
+FLAC_AX_AX_FLAGS = -march=skylake -mbmi -mbmi2 -O3 -flto=thin -ffile-prefix-map=$(@D)=. -ffile-prefix-map=$(BR2_EXTERNAL_PICCOLO_AX_PATH)=.
 
 FLAC_AX_CONF_OPTS += \
 	-DCMAKE_BUILD_TYPE=Release \
-	-DCMAKE_CXX_FLAGS="$(TARGET_CXXFLAGS) -march=skylake -O3" \
+	-DCMAKE_C_FLAGS="$(TARGET_CFLAGS) $(FLAC_AX_AX_FLAGS)" \
+	-DCMAKE_CXX_FLAGS="$(TARGET_CXXFLAGS) $(FLAC_AX_AX_FLAGS)" \
+	-DCMAKE_EXE_LINKER_FLAGS="$(TARGET_LDFLAGS) -flto=thin -Wl,--build-id=sha1" \
 	-DFLAC_AX_USE_AX_SDK=ON \
 	-DFETCHCONTENT_SOURCE_DIR_AX_SDK=$(STAGING_DIR)/usr/src/ax-sdk \
 	-DFLAC_AX_BUILD_VIDEO_UPSCALER=$(if $(BR2_PACKAGE_FLAC_AX_VIDEO_UPSCALER),ON,OFF) \
@@ -63,6 +66,10 @@ define FLAC_AX_INSTALL_UDEV_RULES
 		$(TARGET_DIR)/etc/udev/rules.d/99-ax-usb-dacs.rules
 endef
 endif
+
+define FLAC_AX_BUILD_CMDS
+	$(TARGET_MAKE_ENV) $(MAKE) -j4 -C $(@D)/build
+endef
 
 define FLAC_AX_INSTALL_TARGET_CMDS
 	$(INSTALL) -D -m 0755 $(@D)/flac_ax $(TARGET_DIR)/usr/bin/flac_ax
