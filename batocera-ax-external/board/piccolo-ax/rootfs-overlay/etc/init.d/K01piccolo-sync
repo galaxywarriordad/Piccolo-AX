@@ -12,7 +12,9 @@ is_share_writable() {
 
 cleanup_stale_tmp() {
     [ -d "${SYNC_DIR}" ] || return 0
-    rm -f "${SYNC_DIR}"/*.tmp.* 2>/dev/null || true
+    for f in "${SYNC_DIR}"/*.tar.zst.tmp*; do
+        [ -e "$f" ] && rm -f "$f" 2>/dev/null || true
+    done
 }
 
 restore_cache() {
@@ -45,26 +47,27 @@ save_cache() {
     tmp="${SYNC_DIR}/${name}.tar.zst.tmp.$$"
 
     [ -d "${shm_dir}" ] || return 0
-    # Skip if directory is completely empty
     [ -n "$(ls -A "${shm_dir}" 2>/dev/null)" ] || return 0
     is_share_writable || return 0
 
     mkdir -p "${SYNC_DIR}"
 
-    src_kb=$(du -sk "${shm_dir}" | awk '{print $1}')
-    avail_kb=$(df -kP "${SYNC_DIR}" | awk 'NR==2 {print $4}')
+    src_kb=$(du -sk "${shm_dir}" 2>/dev/null | awk '{print $1}')
+    avail_kb=$(df -kP "${SYNC_DIR}" 2>/dev/null | awk 'NR==2 {print $4}')
+    [ -n "${src_kb}" ] && [ -n "${avail_kb}" ] || return 0
+
     # Require 1.25x source size + 64 MiB safety margin
     req_kb=$(( (src_kb * 5 / 4) + MIN_RESERVE_KB ))
-
-    if [ "${avail_kb:-0}" -lt "${req_kb}" ]; then
+    if [ "${avail_kb}" -lt "${req_kb}" ]; then
         echo "[K01piccolo-sync] Skipping ${name} sync: ${avail_kb} KiB free < ${req_kb} KiB required"
         return 0
     fi
 
-    if tar -cf - -C "/dev/shm" "${name}" | zstd -3 -T1 -q -o "${tmp}"; then
+    if tar -cf - -C "/dev/shm" "${name}" 2>/dev/null | zstd -3 -T1 -q -o "${tmp}"; then
         if zstd -t -q "${tmp}" 2>/dev/null; then
-            sync
-            [ -f "${target}" ] && cp -f "${target}" "${backup}" 2>/dev/null || true
+            if [ -f "${target}" ] && zstd -t -q "${target}" 2>/dev/null; then
+                cp -f "${target}" "${backup}" 2>/dev/null || true
+            fi
             mv -f "${tmp}" "${target}"
             sync
         else
@@ -82,13 +85,8 @@ case "$1" in
             restore_cache "${c}"
         done
         ;;
-    sync|checkpoint)
+    sync|checkpoint|stop)
         cleanup_stale_tmp
-        for c in ${CACHES}; do
-            save_cache "${c}"
-        done
-        ;;
-    stop)
         for c in ${CACHES}; do
             save_cache "${c}"
         done
@@ -99,3 +97,6 @@ case "$1" in
         ;;
 esac
 exit 0
+```[cite: 12]
+
+Are you ready to test this boot/sync stack on your `Piccolo-AX` build, or do you want to check `build-release.yml` / `post-image.sh` next?
