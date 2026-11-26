@@ -1,5 +1,3 @@
-menu "Piccolo [AX] Console Appliance"
-
 menu "1. Core Runtime, Bootloader & Acceleration"
 
 config BR2_PACKAGE_AX_SDK
@@ -19,7 +17,7 @@ config BR2_PACKAGE_LIMINE
 
 config BR2_PACKAGE_LSFG_VK
 	bool "lsfg-vk 2.0.0+ (Implicit Vulkan Frame Generation)"
-	default y
+	default n
 	help
 	  Vulkan 1.2 bindless FP32 frame-generation layer (requires user-supplied
 	  Lossless.dll placed in /userdata/system/lsfg/Lossless.dll).
@@ -37,7 +35,7 @@ menu "2. AX Console & Classic Engines"
 config BR2_PACKAGE_EDEN_AX
 	bool "Eden Espresso Wave [AX] (Nintendo Switch)"
 	depends on BR2_PACKAGE_AX_SDK
-	default y
+	default n
 	select BR2_PACKAGE_QT6
 	select BR2_PACKAGE_QT6BASE
 	select BR2_PACKAGE_QT6BASE_GUI
@@ -53,7 +51,7 @@ config BR2_PACKAGE_EDEN_AX
 config BR2_PACKAGE_CEMU_LATTE_AX
 	bool "Cemu Latte [AX] (Nintendo Wii U)"
 	depends on BR2_PACKAGE_AX_SDK
-	default y
+	default n
 	select BR2_PACKAGE_QT6
 	select BR2_PACKAGE_QT6BASE
 	select BR2_PACKAGE_QT6BASE_GUI
@@ -69,7 +67,7 @@ config BR2_PACKAGE_CEMU_LATTE_AX
 config BR2_PACKAGE_RMG_AX
 	bool "RMG-Mupen [AX] (Nintendo 64)"
 	depends on BR2_PACKAGE_AX_SDK
-	default y
+	default n
 	select BR2_PACKAGE_QT6
 	select BR2_PACKAGE_QT6BASE
 	select BR2_PACKAGE_QT6BASE_GUI
@@ -92,7 +90,7 @@ config BR2_PACKAGE_RMG_AX
 config BR2_PACKAGE_CANNONBALL_AX
 	bool "Cannonball-OutRun [AX] (Sega Arcade)"
 	depends on BR2_PACKAGE_AX_SDK
-	default y
+	default n
 	select BR2_PACKAGE_BOOST
 	select BR2_PACKAGE_SDL2
 	help
@@ -101,7 +99,7 @@ config BR2_PACKAGE_CANNONBALL_AX
 config BR2_PACKAGE_FRONTIER_AX
 	bool "Frontier: Elite II [AX] (Atari ST 68k-to-C)"
 	depends on BR2_PACKAGE_AX_SDK
-	default y
+	default n
 	select BR2_PACKAGE_SDL2
 	select BR2_PACKAGE_LIBGLU
 	help
@@ -110,7 +108,7 @@ config BR2_PACKAGE_FRONTIER_AX
 config BR2_PACKAGE_BLASTEM_AX
 	bool "BlastEm-MegaDrive [AX] (Sega Mega Drive / YM2612)"
 	depends on BR2_PACKAGE_AX_SDK
-	default y
+	default n
 	select BR2_PACKAGE_SDL2
 	select BR2_PACKAGE_LIBGLEW
 	help
@@ -119,7 +117,7 @@ config BR2_PACKAGE_BLASTEM_AX
 config BR2_PACKAGE_FLYCAST_AX
 	bool "Flycast [AX] (Sega Dreamcast / NAOMI / Atomiswave)"
 	depends on BR2_PACKAGE_AX_SDK
-	default y
+	default n
 	select BR2_PACKAGE_SDL2
 	select BR2_PACKAGE_ALSA_LIB
 	select BR2_PACKAGE_LIBCURL
@@ -132,7 +130,7 @@ config BR2_PACKAGE_FLYCAST_AX
 config BR2_PACKAGE_HATARI_AX
 	bool "Hatari [AX] (Atari ST / STE / TT / Falcon)"
 	depends on BR2_PACKAGE_AX_SDK
-	default y
+	default n
 	select BR2_PACKAGE_SDL2
 	select BR2_PACKAGE_ALSA_LIB
 	select BR2_PACKAGE_LIBPNG
@@ -140,8 +138,8 @@ config BR2_PACKAGE_HATARI_AX
 	  Cycle-accurate Atari ST/STE/TT/Falcon emulator with ALSA MIDI and ax-sdk audio ring.
 
 if BR2_EXTERNAL_PICCOLO_AX_PATH != ""
-	source "$BR2_EXTERNAL_PICCOLO_AX_PATH/package/amiberry-ax/Config.in"
-	source "$BR2_EXTERNAL_PICCOLO_AX_PATH/package/genx-snes-ax/Config.in"
+source "$BR2_EXTERNAL_PICCOLO_AX_PATH/package/amiberry-ax/Config.in"
+source "$BR2_EXTERNAL_PICCOLO_AX_PATH/package/genx-snes-ax/Config.in"
 endif
 
 endmenu
@@ -149,7 +147,7 @@ endmenu
 menu "3. FLAC_AX Audio/Visual Studio & Upscaler"
 
 if BR2_EXTERNAL_PICCOLO_AX_PATH != ""
-	source "$BR2_EXTERNAL_PICCOLO_AX_PATH/package/flac-ax/Config.in"
+source "$BR2_EXTERNAL_PICCOLO_AX_PATH/package/flac-ax/Config.in"
 endif
 
 endmenu
@@ -164,15 +162,8 @@ config BR2_PACKAGE_PICCOLO_AX_DESKTOP
 	  Worker, Falkon, GrafX2, LibreSprite, mtPaint, AzPainter, MilkyTracker,
 	  mhWaveEdit, QASMixer, GHex, CPU-X, nvtop, htop) with SHARE persistence.
 
-if BR2_PACKAGE_PICCOLO_AX_DESKTOP
-	if BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH != ""
-		source "$BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH/buildroot/Config.in"
-	endif
-	if BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH = "" && BR2_EXTERNAL_PICCOLO_AX_PATH != ""
-		source "$BR2_EXTERNAL_PICCOLO_AX_PATH/../../piccolo-ax-desktop/buildroot/Config.in"
-	endif
+if BR2_PACKAGE_PICCOLO_AX_DESKTOP && BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH != ""
+source "$BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH/buildroot/Config.in"
 endif
-
-endmenu
 
 endmenu
