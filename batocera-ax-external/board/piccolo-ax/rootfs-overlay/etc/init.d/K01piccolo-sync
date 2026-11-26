@@ -6,8 +6,26 @@ SHARE_MOUNT="/userdata"
 CACHES="emu_cache pgo nv_cache"
 MIN_RESERVE_KB=65536
 
-is_share_writable() {
-    [ -d "${SHARE_MOUNT}" ] && [ -w "${SHARE_MOUNT}" ]
+log_info() {
+    echo "[K01piccolo-sync] $*"
+}
+
+log_warn() {
+    echo "[K01piccolo-sync][WARN] $*" >&2
+}
+
+is_share_mounted_rw() {
+    [ -d "${SHARE_MOUNT}" ] && [ -w "${SHARE_MOUNT}" ] && \
+        grep -qs "[[:space:]]${SHARE_MOUNT}[[:space:]]" /proc/mounts 2>/dev/null
+}
+
+flush_file_durable() {
+    path="$1"
+    if command -v ax-fsync >/dev/null 2>&1; then
+        ax-fsync "${path}" >/dev/null 2>&1 || sync
+    else
+        sync
+    fi
 }
 
 cleanup_stale_tmp() {
@@ -24,18 +42,19 @@ restore_cache() {
     backup="${SYNC_DIR}/${name}.tar.zst.prev"
 
     mkdir -p "${shm_dir}"
-    is_share_writable || return 0
+    is_share_mounted_rw || return 0
 
     chosen=""
     if [ -s "${primary}" ] && zstd -t -q "${primary}" 2>/dev/null; then
         chosen="${primary}"
     elif [ -s "${backup}" ] && zstd -t -q "${backup}" 2>/dev/null; then
-        echo "[K01piccolo-sync] Primary ${name}.tar.zst corrupt/missing; falling back to .prev"
+        log_warn "Primary ${name}.tar.zst corrupt/missing; falling back to .prev"
         chosen="${backup}"
     fi
 
     if [ -n "${chosen}" ]; then
-        zstd -dc "${chosen}" | tar -xf - -C "/dev/shm" 2>/dev/null || true
+        zstd -dc "${chosen}" | tar -xf - -C "/dev/shm" 2>/dev/null || \
+            log_warn "Partial or failed extract for ${name} from ${chosen}"
     fi
 }
 
@@ -48,7 +67,7 @@ save_cache() {
 
     [ -d "${shm_dir}" ] || return 0
     [ -n "$(ls -A "${shm_dir}" 2>/dev/null)" ] || return 0
-    is_share_writable || return 0
+    is_share_mounted_rw || return 0
 
     mkdir -p "${SYNC_DIR}"
 
@@ -59,26 +78,31 @@ save_cache() {
     # Require 1.25x source size + 64 MiB safety margin
     req_kb=$(( (src_kb * 5 / 4) + MIN_RESERVE_KB ))
     if [ "${avail_kb}" -lt "${req_kb}" ]; then
-        echo "[K01piccolo-sync] Skipping ${name} sync: ${avail_kb} KiB free < ${req_kb} KiB required"
+        log_warn "Skipping ${name} sync: ${avail_kb} KiB free < ${req_kb} KiB required"
         return 0
     fi
 
     if tar -cf - -C "/dev/shm" "${name}" 2>/dev/null | zstd -3 -T1 -q -o "${tmp}"; then
-        if zstd -t -q "${tmp}" 2>/dev/null; then
+        if [ -s "${tmp}" ] && zstd -t -q "${tmp}" 2>/dev/null; then
+            flush_file_durable "${tmp}"
             if [ -f "${target}" ] && zstd -t -q "${target}" 2>/dev/null; then
                 cp -f "${target}" "${backup}" 2>/dev/null || true
             fi
             mv -f "${tmp}" "${target}"
-            sync
+            flush_file_durable "${SYNC_DIR}"
+            log_info "Saved ${name} -> ${target}"
         else
-            rm -f "${tmp}"
+            log_warn "Compressed archive failed validation for ${name}; discarding temp file"
+            rm -f "${tmp}" 2>/dev/null || true
         fi
     else
-        rm -f "${tmp}"
+        log_warn "Failed creating archive for ${name}; cleaning temp file"
+        rm -f "${tmp}" 2>/dev/null || true
     fi
 }
 
-case "$1" in
+action="${1:-}"
+case "${action}" in
     start)
         cleanup_stale_tmp
         for c in ${CACHES}; do
