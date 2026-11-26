@@ -56,6 +56,3 @@ EOF
     ;;
 esac
 exit 0
-```[cite: 9, 11]
-
-Would you like to upload another file for audit or check the `Piccolo-AX` build/release workflow next?
