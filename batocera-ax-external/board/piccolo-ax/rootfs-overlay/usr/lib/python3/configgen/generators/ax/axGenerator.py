@@ -1,163 +1,104 @@
-#!/usr/bin/env python3
-import hashlib
-import os
 import shutil
-import signal
 import subprocess
-import sys
 from pathlib import Path
 
-try:
-    from generators.Generator import Generator
-    import Command
-except ImportError:
-    Generator = object
-    Command = None
-
-CACHE_PERSIST_DIR = Path("/userdata/cache")
-EMU_TMPFS = Path("/dev/shm/emu_cache")
-NV_TMPFS = Path("/dev/shm/nv_cache")
-HOST_SAFETY_FLOOR_BYTES = 5 * 1024**3
-MAX_VMTOUCH_BYTES = int(17.5 * 1024**3)
+MIN_RESERVE_BYTES = 64 * 1024 * 1024
 
 
-def get_available_ram_bytes() -> int:
-    with open("/proc/meminfo", "r", encoding="utf-8") as f:
-        for line in f:
-            if line.startswith("MemAvailable:"):
-                return int(line.split()[1]) * 1024
-    return 0
+def _dir_size_bytes(path: Path) -> int:
+    total = 0
+    for item in path.rglob("*"):
+        if item.is_file():
+            try:
+                total += item.stat().st_size
+            except OSError:
+                pass
+    return total
+
+
+def _is_valid_zst(archive: Path) -> bool:
+    if not archive.exists() or archive.stat().st_size == 0:
+        return False
+    res = subprocess.run(
+        ["zstd", "-t", "-q", str(archive)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return res.returncode == 0
+
+
+def cleanup_stale_cache_tmp(title_id: str) -> None:
+    if not CACHE_PERSIST_DIR.exists():
+        return
+    for prefix in ("emu", "nv"):
+        for stale in CACHE_PERSIST_DIR.glob(f"{prefix}_{title_id}.tar.zst.tmp*"):
+            stale.unlink(missing_ok=True)
 
 
 def restore_cache(title_id: str) -> None:
     EMU_TMPFS.mkdir(parents=True, exist_ok=True)
     NV_TMPFS.mkdir(parents=True, exist_ok=True)
+    cleanup_stale_cache_tmp(title_id)
+
     for prefix, target in (("emu", EMU_TMPFS), ("nv", NV_TMPFS)):
-        archive = CACHE_PERSIST_DIR / f"{prefix}_{title_id}.tar.zst"
-        if archive.exists():
-            subprocess.run(["tar", "-I", "zstd", "-xf", str(archive), "-C", str(target)], check=False)
+        primary = CACHE_PERSIST_DIR / f"{prefix}_{title_id}.tar.zst"
+        backup = CACHE_PERSIST_DIR / f"{prefix}_{title_id}.tar.zst.prev"
+
+        chosen: Path | None = None
+        if _is_valid_zst(primary):
+            chosen = primary
+        elif _is_valid_zst(backup):
+            chosen = backup
+
+        if chosen is not None:
+            subprocess.run(
+                ["tar", "-I", "zstd", "-xf", str(chosen), "-C", str(target)],
+                check=False,
+            )
 
 
 def flush_cache_atomic(title_id: str) -> None:
     CACHE_PERSIST_DIR.mkdir(parents=True, exist_ok=True)
+    cleanup_stale_cache_tmp(title_id)
+
     for prefix, src in (("emu", EMU_TMPFS), ("nv", NV_TMPFS)):
-        if src.exists() and any(src.iterdir()):
-            tmp_file = CACHE_PERSIST_DIR / f"{prefix}_{title_id}.tar.zst.tmp"
-            final_file = CACHE_PERSIST_DIR / f"{prefix}_{title_id}.tar.zst"
-            subprocess.run(["tar", "-I", "zstd -3", "-cf", str(tmp_file), "-C", str(src), "."], check=False)
-            os.sync()
-            tmp_file.replace(final_file)
+        if not src.exists() or not any(src.iterdir()):
+            continue
 
+        src_bytes = _dir_size_bytes(src)
+        free_bytes = shutil.disk_usage(CACHE_PERSIST_DIR).free
+        req_bytes = ((src_bytes * 5) // 4) + MIN_RESERVE_BYTES
+        if free_bytes < req_bytes:
+            continue
 
-def pin_rom_assets(rom_path: Path) -> subprocess.Popen | None:
-    if not rom_path.exists() or not Path("/usr/bin/vmtouch").exists():
-        return None
-    avail = get_available_ram_bytes()
-    budget = min(MAX_VMTOUCH_BYTES, max(0, avail - HOST_SAFETY_FLOOR_BYTES))
-    if budget < 256 * 1024**2:
-        return None
-    max_mb = budget // (1024 * 1024)
-    return subprocess.Popen(
-        ["taskset", "-c", "5", "vmtouch", "-dql", f"-m{max_mb}M", str(rom_path)],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+        tmp_file = CACHE_PERSIST_DIR / f"{prefix}_{title_id}.tar.zst.tmp.{os.getpid()}"
+        final_file = CACHE_PERSIST_DIR / f"{prefix}_{title_id}.tar.zst"
+        prev_file = CACHE_PERSIST_DIR / f"{prefix}_{title_id}.tar.zst.prev"
 
-
-def toggle_emulationstation(sig: int) -> None:
-    res = subprocess.run(["pidof", "emulationstation"], capture_output=True, text=True, check=False)
-    for pid_str in res.stdout.strip().split():
         try:
-            pid = int(pid_str)
-            subprocess.run(
-                ["taskset", "-pc", "5", str(pid)],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+            res = subprocess.run(
+                ["tar", "-cf", "-", "-C", str(src), "."],
+                stdout=subprocess.PIPE,
                 check=False,
             )
-            os.kill(pid, sig)
-        except (ValueError, ProcessLookupError):
-            pass
+            if res.returncode != 0 or not res.stdout:
+                tmp_file.unlink(missing_ok=True)
+                continue
 
+            zstd_res = subprocess.run(
+                ["zstd", "-3", "-T1", "-q", "-o", str(tmp_file)],
+                input=res.stdout,
+                check=False,
+            )
+            if zstd_res.returncode != 0 or not _is_valid_zst(tmp_file):
+                tmp_file.unlink(missing_ok=True)
+                continue
 
-def build_emulator_cmd(system_name: str, rom_path: Path) -> list[str]:
-    if system_name == "wiiu":
-        emu_args = ["/usr/bin/Cemu", "-f", "-g", str(rom_path)]
-    elif system_name == "n64":
-        emu_args = ["/usr/bin/RMG", "--nogui", "--fullscreen", str(rom_path)]
-    elif system_name == "cannonball":
-        emu_args = ["/usr/bin/cannonball", "-cfgfile", "/userdata/system/configs/cannonball/config.xml"]
-    elif system_name == "frontier":
-        emu_args = ["/usr/bin/frontier-fe2", "-f"]
-    elif system_name == "megadrive":
-        emu_args = ["/usr/bin/blastem", "-f", str(rom_path)]
-    elif system_name in ("dreamcast", "naomi", "atomiswave"):
-        emu_args = ["/usr/bin/flycast", "-config", "window:fullscreen=yes", str(rom_path)]
-    elif system_name == "atarist":
-        emu_args = ["/usr/bin/hatari", "--fullscreen", str(rom_path)]
-    elif system_name in ("amiga", "amiga500", "amiga1200", "amigacd32"):
-        emu_args = ["/usr/bin/amiberry", "--autoload", str(rom_path), "-G"]
-    elif system_name in ("fbneo", "neogeo", "cps1", "cps2", "cps3", "arcade"):
-        emu_args = ["/usr/bin/retroarch", "-f", "-L", "/usr/lib/libretro/fbneo_libretro.so", str(rom_path)]
-    else:
-        emu_args = ["/usr/bin/eden-cli", "-f", "-g", str(rom_path)]
-    if Path("/sys/fs/cgroup/eden.slice").exists():
-        return ["cgexec", "-g", "cpuset:eden.slice", *emu_args]
-    return emu_args
+            if _is_valid_zst(final_file):
+                shutil.copy2(final_file, prev_file)
 
-
-def launch_title(system_name: str, rom_path_str: str, title_id: str) -> int:
-    rom_path = Path(rom_path_str)
-    restore_cache(title_id)
-    vmtouch_proc = pin_rom_assets(rom_path)
-
-    env = os.environ.copy()
-    env.setdefault("DISPLAY", ":0")
-    env["QT_QPA_PLATFORM"] = "xcb"
-    env["__GL_YIELD"] = "NOTHING"
-    env["__GL_SYNC_TO_VBLANK"] = "1"
-    env["__GL_MaxFramesAllowed"] = "1"
-    env["__GL_SHADER_DISK_CACHE"] = "1"
-    env["__GL_SHADER_DISK_CACHE_SKIP_CLEANUP"] = "1"
-    env["__GL_SHADER_DISK_CACHE_PATH"] = str(NV_TMPFS)
-    env["MESA_VK_WSI_PRESENT_MODE"] = "fifo"
-    env["XDG_CACHE_HOME"] = str(EMU_TMPFS)
-
-    subprocess.run(["pkill", "-USR1", "-x", "flac_ax"], check=False)
-    subprocess.run(["pkill", "-USR1", "-x", "ax_av_studio"], check=False)
-    subprocess.run(["pkill", "-USR1", "-x", "ax_video_upscaler"], check=False)
-    toggle_emulationstation(signal.SIGSTOP)
-    try:
-        cmd = build_emulator_cmd(system_name, rom_path)
-        proc = subprocess.run(cmd, env=env, check=False)
-        return proc.returncode
-    finally:
-        if vmtouch_proc:
-            vmtouch_proc.terminate()
-            vmtouch_proc.wait(timeout=3)
-        flush_cache_atomic(title_id)
-        shutil.rmtree(EMU_TMPFS, ignore_errors=True)
-        shutil.rmtree(NV_TMPFS, ignore_errors=True)
-        toggle_emulationstation(signal.SIGCONT)
-
-
-class AxGenerator(Generator):
-    def generate(self, system, rom, playersControllers, metadata, guns, wheels, gameResolution):
-        rom_path = Path(rom)
-        title_id = hashlib.sha256(rom_path.name.encode("utf-8")).hexdigest()[:16]
-        wrapper = [
-            "/usr/bin/python3",
-            __file__,
-            system.name,
-            str(rom_path),
-            title_id,
-        ]
-        return Command.Command(array=wrapper)
-
-    def getMouseMode(self, config, rom):
-        return False
-
-
-if __name__ == "__main__":
-    if len(sys.argv) >= 4:
-        sys.exit(launch_title(sys.argv[1], sys.argv[2], sys.argv[3]))
+            tmp_file.replace(final_file)
+            os.sync()
+        except OSError:
+            tmp_file.unlink(missing_ok=True)
