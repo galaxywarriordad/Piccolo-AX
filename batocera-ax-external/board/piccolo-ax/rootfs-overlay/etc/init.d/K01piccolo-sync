@@ -97,6 +97,3 @@ case "$1" in
         ;;
 esac
 exit 0
-```[cite: 12]
-
-Are you ready to test this boot/sync stack on your `Piccolo-AX` build, or do you want to check `build-release.yml` / `post-image.sh` next?
