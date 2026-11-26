@@ -5,7 +5,7 @@
 ################################################################################
 
 AX_SDK_VERSION = main
-AX_SDK_SITE = [https://github.com/galaxywarriordad/ax-sdk.git](https://github.com/galaxywarriordad/ax-sdk.git)
+AX_SDK_SITE = https://github.com/galaxywarriordad/ax-sdk.git
 AX_SDK_SITE_METHOD = git
 AX_SDK_LICENSE = MIT
 AX_SDK_LICENSE_FILES = LICENSE
