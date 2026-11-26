@@ -79,7 +79,14 @@ mmd -i "${BOOT_IMG}" ::/EFI ::/EFI/BOOT ::/boot
 mcopy -i "${BOOT_IMG}" "${BOARD_DIR}/limine.conf" ::/limine.conf
 mcopy -i "${BOOT_IMG}" "${EROFS_OUT}" ::/boot/rootfs.erofs
 [ -f "${EROFS_PREV}" ] && mcopy -i "${BOOT_IMG}" "${EROFS_PREV}" ::/boot/rootfs.erofs.prev
-[ -f "${BINARIES_DIR}/bzImage" ] && mcopy -i "${BOOT_IMG}" "${BINARIES_DIR}/bzImage" ::/boot/bzImage
+
+if [ -f "${BINARIES_DIR}/vmlinuz-6.12-rt" ]; then
+    mcopy -i "${BOOT_IMG}" "${BINARIES_DIR}/vmlinuz-6.12-rt" ::/boot/vmlinuz-6.12-rt
+elif [ -f "${BINARIES_DIR}/bzImage" ]; then
+    mcopy -i "${BOOT_IMG}" "${BINARIES_DIR}/bzImage" ::/boot/bzImage
+    mcopy -i "${BOOT_IMG}" "${BINARIES_DIR}/bzImage" ::/boot/vmlinuz-6.12-rt
+fi
+
 [ -f "${BINARIES_DIR}/initrd.lz4" ] && mcopy -i "${BOOT_IMG}" "${BINARIES_DIR}/initrd.lz4" ::/boot/initrd.lz4
 
 echo "[Piccolo-AX] Building ${SHARE_PART_MIB} MiB ext4 (^has_journal, SHARE) image..."
