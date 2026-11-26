@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Piccolo-AX
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install build dependencies
         run: |
@@ -34,29 +34,27 @@ jobs:
 
       - name: Verify CLI flags and filter modes
         run: |
-          set -e
+          set -euo pipefail
           mkdir -p /tmp/piccolo_ci_cli
           printf 'DUMMY_SNES_ROM' > /tmp/piccolo_ci_cli/demo.sfc
 
-          cat <<EOF > /tmp/piccolo_ci_cli/ax_engine.ini
-          [snes]
-          enabled = true
-          engine_backend = "bsnes"
-          profile_preset = "stock_cycle_exact"
-          audio_filter_mode = "default"
-          shm_staging_enabled = false
-          dac_lock_path = "/tmp/piccolo_ci_cli/ax-dac.lock"
-          persistent_save_dir = "/tmp/piccolo_ci_cli/saves"
-          EOF
+          cat <<'EOF' > /tmp/piccolo_ci_cli/ax_engine.ini
+[snes]
+enabled = true
+engine_backend = "bsnes"
+profile_preset = "stock_cycle_exact"
+audio_filter_mode = "default"
+shm_staging_enabled = false
+dac_lock_path = "/tmp/piccolo_ci_cli/ax-dac.lock"
+persistent_save_dir = "/tmp/piccolo_ci_cli/saves"
+EOF
 
-          # Missing --rom should return exit code 2
           set +e
           ./build/genx-snes-ax >/dev/null 2>&1
           rc=$?
           set -e
           test "$rc" -eq 2
 
-          # Test all three audio filter options + retro HUD flags
           for flt in default zsnes_warm crt_nearfield; do
             ./build/genx-snes-ax \
               --config /tmp/piccolo_ci_cli/ax_engine.ini \
@@ -65,7 +63,6 @@ jobs:
               --scanlines 25
           done
 
-          # Test headless/no-chrome flag
           ./build/genx-snes-ax \
             --config /tmp/piccolo_ci_cli/ax_engine.ini \
             --rom /tmp/piccolo_ci_cli/demo.sfc \
@@ -73,3 +70,6 @@ jobs:
             --no-retro-chrome
 
           rm -rf /tmp/piccolo_ci_cli
+```[cite: 17]
+
+Are you triggering `build-release.yml` next, or do you have `post-build.sh` / `post-image.sh` to review before building the image?
