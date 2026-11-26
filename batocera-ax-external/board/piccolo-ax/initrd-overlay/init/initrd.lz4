@@ -1,0 +1,71 @@
+#!/bin/sh
+set -eu
+
+# 1. Mount virtual filesystems required for block discovery & /dev/shm toram staging
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+mkdir -p /dev/shm /mnt/boot /mnt/erofs
+mount -t tmpfs -o mode=1777,size=2G tmpfs /dev/shm
+
+# 2. Parse kernel cmdline for piccolo.rootfs= (default: rootfs.erofs)
+ROOTFS_NAME="rootfs.erofs"
+if [ -r /proc/cmdline ]; then
+	for arg in $(cat /proc/cmdline); do
+		case "$arg" in
+			piccolo.rootfs=*)
+				ROOTFS_NAME="${arg#piccolo.rootfs=}"
+				;;
+		esac
+	done
+fi
+
+# 3. Locate and mount the BATOCERA boot partition
+BOOT_DEV=""
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+	BOOT_DEV="$(blkid -L BATOCERA 2>/dev/null || true)"
+	if [ -n "$BOOT_DEV" ] && [ -b "$BOOT_DEV" ]; then
+		break
+	fi
+	sleep 0.25
+done
+
+if [ -z "$BOOT_DEV" ] || ! mount -o ro "$BOOT_DEV" /mnt/boot 2>/dev/null; then
+	echo "[initrd] ERROR: Unable to mount BATOCERA boot partition; dropping to rescue shell" >&2
+	exec /bin/sh
+fi
+
+try_toram_erofs() {
+	img_name="$1"
+	src_file="/mnt/boot/boot/${img_name}"
+	dst_file="/dev/shm/rootfs.erofs"
+
+	[ -f "$src_file" ] || return 1
+	rm -f "$dst_file"
+	dd if="$src_file" of="$dst_file" bs=4M conv=fsync status=none 2>/dev/null || return 1
+	mount -t erofs -o ro "$dst_file" /mnt/erofs 2>/dev/null || {
+		rm -f "$dst_file"
+		return 1
+	}
+	return 0
+}
+
+# 4. Copy selected EROFS image to /dev/shm (toram) with A/B fallback to rootfs.erofs.prev
+if try_toram_erofs "$ROOTFS_NAME"; then
+	echo "[initrd] Loaded /boot/boot/${ROOTFS_NAME} into /dev/shm/rootfs.erofs"
+elif [ "$ROOTFS_NAME" != "rootfs.erofs.prev" ] && try_toram_erofs "rootfs.erofs.prev"; then
+	echo "[initrd][WARN] Primary ${ROOTFS_NAME} failed; booted A/B fallback rootfs.erofs.prev" >&2
+else
+	echo "[initrd] ERROR: Failed to load EROFS rootfs into /dev/shm; dropping to rescue shell" >&2
+	exec /bin/sh
+fi
+
+# 5. Clean up /dev/shm copy once mounted and hand off via switch_root
+umount /mnt/boot 2>/dev/null || true
+rm -f /dev/shm/rootfs.erofs
+
+mount --move /dev /mnt/erofs/dev
+mount --move /proc /mnt/erofs/proc
+mount --move /sys /mnt/erofs/sys
+
+exec switch_root /mnt/erofs /sbin/init
