@@ -56,10 +56,10 @@ save_cache() {
 
     if tar -cf - -C "/dev/shm" "${name}" | zstd -3 -T1 -q -o "${tmp}"; then
         if zstd -t -q "${tmp}" 2>/dev/null; then
-            sync "${tmp}" 2>/dev/null || sync
+            sync
             [ -f "${target}" ] && cp -f "${target}" "${backup}" 2>/dev/null || true
             mv -f "${tmp}" "${target}"
-            sync "${SYNC_DIR}" 2>/dev/null || sync
+            sync
         else
             rm -f "${tmp}"
         fi
