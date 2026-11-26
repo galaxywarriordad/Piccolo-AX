@@ -70,6 +70,3 @@ EOF
             --no-retro-chrome
 
           rm -rf /tmp/piccolo_ci_cli
-```[cite: 17]
-
-Are you triggering `build-release.yml` next, or do you have `post-build.sh` / `post-image.sh` to review before building the image?
