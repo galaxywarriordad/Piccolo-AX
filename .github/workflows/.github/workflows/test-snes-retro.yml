@@ -1,0 +1,75 @@
+name: SNES Retro UI & Audio Filter Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Piccolo-AX
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake ninja-build g++
+
+      - name: Configure and build genx-snes-ax and smoke test
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target genx-snes-ax -j 4
+          g++ -std=c++20 -O2 -Wall -Wextra -Werror \
+            -Isrc \
+            tests/snes_retro_smoke_test.cpp \
+            src/snes/ax_snes_adapter.cpp \
+            -lpthread \
+            -o build/snes_retro_smoke_test
+
+      - name: Run C++20 smoke test
+        run: ./build/snes_retro_smoke_test
+
+      - name: Verify CLI flags and filter modes
+        run: |
+          set -e
+          mkdir -p /tmp/piccolo_ci_cli
+          printf 'DUMMY_SNES_ROM' > /tmp/piccolo_ci_cli/demo.sfc
+
+          cat <<EOF > /tmp/piccolo_ci_cli/ax_engine.ini
+          [snes]
+          enabled = true
+          engine_backend = "bsnes"
+          profile_preset = "stock_cycle_exact"
+          audio_filter_mode = "default"
+          shm_staging_enabled = false
+          dac_lock_path = "/tmp/piccolo_ci_cli/ax-dac.lock"
+          persistent_save_dir = "/tmp/piccolo_ci_cli/saves"
+          EOF
+
+          # Missing --rom should return exit code 2
+          set +e
+          ./build/genx-snes-ax >/dev/null 2>&1
+          rc=$?
+          set -e
+          test "$rc" -eq 2
+
+          # Test all three audio filter options + retro HUD flags
+          for flt in default zsnes_warm crt_nearfield; do
+            ./build/genx-snes-ax \
+              --config /tmp/piccolo_ci_cli/ax_engine.ini \
+              --rom /tmp/piccolo_ci_cli/demo.sfc \
+              --filter "$flt" \
+              --scanlines 25
+          done
+
+          # Test headless/no-chrome flag
+          ./build/genx-snes-ax \
+            --config /tmp/piccolo_ci_cli/ax_engine.ini \
+            --rom /tmp/piccolo_ci_cli/demo.sfc \
+            --filter zsnes_warm \
+            --no-retro-chrome
+
+          rm -rf /tmp/piccolo_ci_cli
