@@ -99,6 +99,3 @@ case "$1" in
         ;;
 esac
 exit 0
-```[cite: 9]
-
-Reply `y` when ready for the bonus update: **`Piccolo-AX/.../etc/init.d/S01piccolo-isolate`** (so all 9 uploaded files are covered).
