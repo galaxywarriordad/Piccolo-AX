@@ -162,8 +162,4 @@ config BR2_PACKAGE_PICCOLO_AX_DESKTOP
 	  Worker, Falkon, GrafX2, LibreSprite, mtPaint, AzPainter, MilkyTracker,
 	  mhWaveEdit, QASMixer, GHex, CPU-X, nvtop, htop) with SHARE persistence.
 
-if BR2_PACKAGE_PICCOLO_AX_DESKTOP && BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH != ""
-source "$BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH/buildroot/Config.in"
-endif
-
 endmenu
