@@ -5,16 +5,16 @@
 The **AX Project** separates shared low-level C++20 silicon abstractions (`ax-sdk`) from platform-, emulator-, and workbench-specific repositories so upstream rebases stay clean while hardware isolation logic remains unified across Windows 10/11, bare-metal `x86_64` Linux, and `aarch64` handhelds.
 
 ```
-         +-------------------------------------------------------+
-         |                   ax-sdk (v1_36_2)                    |
-         |        (https://github.com/galaxywarriordad/ax-sdk)   |
-         | Shared C++20 Silicon Core, Dynamic SMT/CCX & 1:2:1    |
-         |   Topology, Platform Shims, Telemetry & Master Specs  |
-         +-------------------------------------------------------+
-          /             /                       \                 \
-  FetchContent   FetchContent/           FetchContent\         BR2_EXTERNAL
-        /               /                             \                 \
-       v               v                               v                 v
+ +-------------------------------------------------------+
+ | ax-sdk (v1_36_2)                                      |
+ | (https://github.com/galaxywarriordad/ax-sdk)          |
+ | Shared C++20 Silicon Core, Dynamic SMT/CCX & 1:2:1    |
+ | Topology, Platform Shims, Telemetry & Master Specs    |
+ +-------------------------------------------------------+
+          /             /              \              \
+     FetchContent  FetchContent/   FetchContent\     BR2_EXTERNAL
+        /             /                  \            \
+       v             v                    v            v
 +-----------------------+ +-------------------+ +------------------+ +-----------------------+
 | Eden-Espresso-Wave-AX | | Cemu-Latte-AX     | | Amiberry-AX      | | Generation-X-AX       |
 | (Forgejo — Switch)    | | (GitHub — Wii U)  | | (GitHub — Amiga) | | (GitHub — 7 Classics) |
@@ -22,30 +22,30 @@ The **AX Project** separates shared low-level C++20 silicon abstractions (`ax-sd
 | LLVM 23 PGO, QSV      | | Powered by ax     | | Powered by ax    | | EDuke32, Frontier,    |
 |                       | |                   | |                  | | Flycast & Hatari      |
 +-----------------------+ +-------------------+ +------------------+ +-----------------------+
-                                                                         |
-                               +-----------------------+-----------------+
-                               |                       |
-                               v                       v
-                   +-------------------+   +-------------------+   +---------------------------------------+
-                   | Piccolo-2go       |   | Piccolo-AX        |   | FLAC_AX                               |
-                   | (GitHub — ARM64 OS|   | (GitHub — x86 OS) |   | (GitHub — A/V Studio, Hosts & ESS DAC)|
-                   | RK3326 1:2:1      |   | < 512 MB toram    |   | flac_ax, ax_clap_host, ax_lv2_host,   |
-                   | BATLEXP G350/R36S |   | 6.12-rt Appliance |   | ax_av_studio, ax_video_upscaler, TUI  |
-                   +-------------------+   +---------+---------+   +---------------------------------------+
-                                                     |
-                                                     v
-                                           +-------------------+
-                                           | piccolo-ax-desktop|
-                                           | (GitHub — <42 MB) |
-                                           | C/C++ Workbench   |
-                                           +-------------------+
+                                                           |
+                                   +-----------------------+-----------------+
+                                   |                                         |
+                                   v                                         v
+                   +-------------------+                   +-------------------+ +---------------------------------------+
+                   | Piccolo-2go       |                   | Piccolo-AX        | | FLAC_AX                               |
+                   | (GitHub — ARM64 OS|                   | (GitHub — x86 OS) | | (GitHub — A/V Studio, Hosts & ESS DAC)|
+                   | RK3326 1:2:1      |                   | < 512 MB toram    | | flac_ax, ax_clap_host, ax_lv2_host,   |
+                   | BATLEXP G350/R36S |                   | 6.12-rt Appliance | | ax_av_studio, ax_video_upscaler, TUI  |
+                   +-------------------+                   +---------+---------+ +---------------------------------------+
+                                                                     |
+                                                                     v
+                                                           +-------------------+
+                                                           | piccolo-ax-desktop|
+                                                           | (GitHub — <42 MB) |
+                                                           | C/C++ Workbench   |
+                                                           +-------------------+
 ```
 
 ### Repository Breakdown & Lineage (All 9 Repositories)
 
 | Repository | Host & Canonical URL | Primary Role & Lineage |
 | :---- | :---- | :---- |
-| **ax-sdk** | **GitHub:** `galaxywarriordad/ax-sdk` | Shared, zero-dependency C++20 silicon library (`libax_core` / `ax::core`, `v1_36_2`), dynamic Intel SMT / AMD CCX / `RK3326` `1:2:1` topology resolver, Win32/Linux platform shims, and cross-project master specs. |
+| **ax-sdk** | **GitHub:** `galaxywarriordad/ax-sdk` | Shared, zero-dependency C++20 silicon library (`libax_core` / `ax::core`, `v1_36_2`), dynamic Intel SMT / AMD CCX / `RK3326` `1:2:1` topology resolver, Win32/Linux platform shims, cross-project master specs, and read-only pre-flight auditing (`ax_doctor.sh`). |
 | **Eden-Espresso-Wave-AX** | **Forgejo:** `galaxywarriordad/Eden-Espresso-Wave-AX` | **Windows 10/11 Switch Engine Master** — Direct fork of upstream Eden hosted on Forgejo for frictionless PR cherry-picks; features LLVM `clang-cl` 23+ 3-stage PGO, FlexASIO/WASAPI Exclusive audio, Intel QSV offload, and Maxwell GM200 VRAM shields. |
 | **Piccolo-AX** | **GitHub:** `galaxywarriordad/Piccolo-AX` | **Batocera Linux Branch of `Eden-Espresso-Wave-AX`** — Adapts the Espresso Wave `[AX]` engine for bare-metal Linux (`Linux 6.12-rt`, direct ALSA `SCHED_FIFO`, `iHD` VA-API `dma_buf`) and packages all `[AX]` engines and studios via `batocera-ax-external/` into a `< 512 MB` `toram` EROFS USB 3.0 console appliance. |
 | **Piccolo-2go** | **GitHub:** `galaxywarriordad/Piccolo-2go` | **Deterministic `aarch64` Buildroot Handheld OS** — `< 140 MB` `zstd` SquashFS for **BATLEXP G350** & **R36S** (`RK3326`, `1:2:1` isolation, `1024 MB LZ4` ZRAM, `Panfrost` KMS/DRM, dual SanDisk `SDR50` guard, and **HiBy FC3 `1.3 Vrms`** OTG audio). |
@@ -66,6 +66,7 @@ The **AX Project** separates shared low-level C++20 silicon abstractions (`ax-sd
 
 ### Core Architectural Constraints & Design Principles
 
+* **Deterministic Memory & Diagnostic Governance:** RAM layout, `1G`/`2M` HugeTLB reserves, `512 MB` LZ4 `zram` (`vm.swappiness=1`), `toram` `EROFS` (`<= 512 MiB` / `524288 KB`), and `VkVramShield` ceilings follow fixed, repeatable rules rather than dynamic AI/ML guessing or background inference daemons. `ax_doctor` acts strictly as a read-only, on-demand pre-flight and diagnostic check (verifying kernel isolation cmdline flags, `MemAvailable` and HugeTLB/zram/toram headroom, IRQ affinity masks, and `/run/lock/ax-dac.lock` / DAC readiness without background polling or silent mutation), while any AI/log tooling remains strictly offline on CPU/RAM outside the live appliance image and outside GPU VRAM.  
 * **Immutable `toram` EROFS Rootfs (`<= 512 MiB` / `524288 KB`):** Packed with `mkfs.erofs -zlz4hc,9 -T0 --force-uid=0 --force-gid=0` so the read-only appliance rootfs fits comfortably in RAM with zero runtime flash wear.  
 * **Journal-Free `ext4` `SHARE` Partition (`-O ^has_journal`):** Mounted on `/userdata` to eliminate ext4 journal write amplification on Samsung FIT Plus (`64 GB` `MUF-64AB/APC` and `128 GB`) USB flash storage.  
 * **First-Boot Dynamic Expansion (`ax-grow-share.sh`):** Keeps the build-time image compact (`4096 MiB` `BATOCERA` FAT32 \+ `2048 MiB` default `SHARE` ext4) so a single flash image works across both `64 GB` and `128 GB` drives, then relocates the GPT backup header (`sgdisk -e`), grows partition 2 to `100%`, and expands the `ext4` filesystem (`resize2fs`) on first boot.  
@@ -138,15 +139,15 @@ else
   echo "[Piccolo-AX] Installing piccolo-ax-desktop workbench launchers..."
   install -d -m 0755 "${TARGET_DIR}/etc/profile.d" "${TARGET_DIR}/usr/local/bin"
   install -m 0644 "${DESKTOP_REPO}/overlays/common/etc/profile.d/ax-desktop-xdg.sh" \
-                 "${TARGET_DIR}/etc/profile.d/ax-desktop-xdg.sh"
+    "${TARGET_DIR}/etc/profile.d/ax-desktop-xdg.sh"
   install -m 0755 "${DESKTOP_REPO}/scripts/launch-desktop.sh" \
-                 "${TARGET_DIR}/usr/local/bin/launch-desktop.sh"
+    "${TARGET_DIR}/usr/local/bin/launch-desktop.sh"
   install -m 0755 "${DESKTOP_REPO}/scripts/launch-falkon.sh" \
-                 "${TARGET_DIR}/usr/local/bin/launch-falkon.sh"
+    "${TARGET_DIR}/usr/local/bin/launch-falkon.sh"
   install -m 0755 "${DESKTOP_REPO}/scripts/stage-share-apps.sh" \
-                 "${TARGET_DIR}/usr/local/bin/stage-share-apps.sh"
+    "${TARGET_DIR}/usr/local/bin/stage-share-apps.sh"
   install -m 0755 "${DESKTOP_REPO}/scripts/launch-mtpaint.sh" \
-                 "${TARGET_DIR}/usr/local/bin/mtpaint"
+    "${TARGET_DIR}/usr/local/bin/mtpaint"
 fi
 
 # 4. Ensure init hooks & scripts are executable
@@ -955,13 +956,3 @@ else
 fi
 ```
 
----
-
-## Ecosystem Implementation Roadmap & Raspberry Pi (aarch64) Integration
-
-### Optimized Multi-Phase Roadmap (Q1–Q4)
-
-* **Q1 — Core Persistence Architecture & No-Shutdown-Dependency Gate:** Implement atomic save state and config mutations written directly to `/userdata` (`SHARE`) via temporary file creation, `fsync`, and rename hooks so game progress and settings remain fully protected against power loss without relying on clean shutdown scripts.  
-* **Q2 — Unified `aarch64` Target, `ax.toram` Contract & RP1 Pinning:** Standardize Raspberry Pi 4B and Pi 5 support under a single Buildroot target utilizing an explicit `ax.toram=0|1` boot parameter to toggle RAM loading based on available physical memory. Enforce strict RP1 I/O controller and MSI IRQ pinning across Raspberry Pi 5 hardware blocks.  
-* **Q3 — Hardware Memory & Latency Gating, Stability Freeze Tag:** Enforce `>= 4 GB` RAM system checks alongside board-specific audio round-trip latency gates (4.00 ms on Pi 4B, 2.00 ms on Pi 5). Seal phase end with a formal stability freeze tag across all shared libraries.  
-* **Q4 — 11th-Gen AVX-512 / RPCS3-AX Showcase & Reproducible Releases:** Showcase high-performance AVX-512 optimizations for 11th-gen x86\_64 processors alongside RPCS3-AX emulation integration. Publish fully reproducible field release images and build scripts across all target boards.
