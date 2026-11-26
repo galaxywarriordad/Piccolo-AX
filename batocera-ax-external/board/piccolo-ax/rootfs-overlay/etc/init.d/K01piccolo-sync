@@ -2,8 +2,13 @@
 # Piccolo-AX Crash-Safe Ephemeral Cache Sync (/dev/shm <-> /userdata/system/ax-sync)
 
 SYNC_DIR="/userdata/system/ax-sync"
+SHARE_MOUNT="/userdata"
 CACHES="emu_cache pgo nv_cache"
 MIN_RESERVE_KB=65536
+
+is_share_writable() {
+    [ -d "${SHARE_MOUNT}" ] && [ -w "${SHARE_MOUNT}" ]
+}
 
 cleanup_stale_tmp() {
     [ -d "${SYNC_DIR}" ] || return 0
@@ -17,6 +22,7 @@ restore_cache() {
     backup="${SYNC_DIR}/${name}.tar.zst.prev"
 
     mkdir -p "${shm_dir}"
+    is_share_writable || return 0
 
     chosen=""
     if [ -s "${primary}" ] && zstd -t -q "${primary}" 2>/dev/null; then
@@ -41,6 +47,7 @@ save_cache() {
     [ -d "${shm_dir}" ] || return 0
     # Skip if directory is completely empty
     [ -n "$(ls -A "${shm_dir}" 2>/dev/null)" ] || return 0
+    is_share_writable || return 0
 
     mkdir -p "${SYNC_DIR}"
 
@@ -92,3 +99,6 @@ case "$1" in
         ;;
 esac
 exit 0
+```[cite: 9]
+
+Reply `y` when ready for the bonus update: **`Piccolo-AX/.../etc/init.d/S01piccolo-isolate`** (so all 9 uploaded files are covered).
