@@ -1,12 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-TARGET_DIR="$1"
+TARGET_DIR="${1:?Usage: $0 <target_dir>}"
 DESKTOP_REPO="${BR2_EXTERNAL_PICCOLO_AX_DESKTOP_PATH:-}"
-if [ -z "${DESKTOP_REPO}" ] && [ -n "${BR2_EXTERNAL_PICCOLO_AX_PATH:-}" ]; then
-    CANDIDATE="${BR2_EXTERNAL_PICCOLO_AX_PATH}/../../piccolo-ax-desktop"
-    [ -d "${CANDIDATE}" ] && DESKTOP_REPO="${CANDIDATE}"
-fi
 
 DESKTOP_ENABLED=0
 if [ -n "${DESKTOP_REPO}" ] && [ -d "${DESKTOP_REPO}" ]; then
@@ -56,33 +52,33 @@ if [ "${DESKTOP_ENABLED}" -eq 0 ]; then
 else
     echo "[Piccolo-AX] Installing piccolo-ax-desktop workbench overlays & launchers..."
     install -D -m 0644 "${DESKTOP_REPO}/overlays/common/etc/profile.d/ax-desktop-xdg.sh" \
-        "${TARGET_DIR}/etc/profile.d/ax-desktop-xdg.sh"
+                   "${TARGET_DIR}/etc/profile.d/ax-desktop-xdg.sh"
     install -D -m 0644 "${DESKTOP_REPO}/overlays/common/etc/mpv/mpv.conf" \
-        "${TARGET_DIR}/etc/mpv/mpv.conf"
+                   "${TARGET_DIR}/etc/mpv/mpv.conf"
 
     if [ -f "${DESKTOP_REPO}/overlays/common/etc/xdg/lxqt/lxqt.conf" ]; then
         install -D -m 0644 "${DESKTOP_REPO}/overlays/common/etc/xdg/lxqt/lxqt.conf" \
-            "${TARGET_DIR}/etc/xdg/lxqt/lxqt.conf"
+                       "${TARGET_DIR}/etc/xdg/lxqt/lxqt.conf"
     fi
     if [ -f "${DESKTOP_REPO}/overlays/common/etc/xdg/qterminal.org/qterminal.ini" ]; then
         install -D -m 0644 "${DESKTOP_REPO}/overlays/common/etc/xdg/qterminal.org/qterminal.ini" \
-            "${TARGET_DIR}/etc/xdg/qterminal.org/qterminal.ini"
+                       "${TARGET_DIR}/etc/xdg/qterminal.org/qterminal.ini"
     fi
 
     if [ -d "${DESKTOP_REPO}/overlays/common/usr/share/grub/themes/piccolo-ax" ]; then
         install -d -m 0755 "${TARGET_DIR}/usr/share/grub/themes/piccolo-ax/icons"
         install -m 0644 "${DESKTOP_REPO}/overlays/common/usr/share/grub/themes/piccolo-ax/theme.txt" \
-            "${TARGET_DIR}/usr/share/grub/themes/piccolo-ax/theme.txt"
+                       "${TARGET_DIR}/usr/share/grub/themes/piccolo-ax/theme.txt"
         install -m 0644 "${DESKTOP_REPO}/overlays/common/usr/share/grub/themes/piccolo-ax/icons/"*.png \
-            "${TARGET_DIR}/usr/share/grub/themes/piccolo-ax/icons/" 2>/dev/null || true
+                       "${TARGET_DIR}/usr/share/grub/themes/piccolo-ax/icons/" 2>/dev/null || true
     fi
 
     install -d -m 0755 "${TARGET_DIR}/usr/local/bin"
-    install -m 0755 "${DESKTOP_REPO}/scripts/launch-desktop.sh"   "${TARGET_DIR}/usr/local/bin/launch-desktop.sh"
-    install -m 0755 "${DESKTOP_REPO}/scripts/launch-falkon.sh"    "${TARGET_DIR}/usr/local/bin/launch-falkon.sh"
-    install -m 0755 "${DESKTOP_REPO}/scripts/launch-yt.sh"        "${TARGET_DIR}/usr/local/bin/launch-yt.sh"
+    install -m 0755 "${DESKTOP_REPO}/scripts/launch-desktop.sh" "${TARGET_DIR}/usr/local/bin/launch-desktop.sh"
+    install -m 0755 "${DESKTOP_REPO}/scripts/launch-falkon.sh" "${TARGET_DIR}/usr/local/bin/launch-falkon.sh"
+    install -m 0755 "${DESKTOP_REPO}/scripts/launch-yt.sh" "${TARGET_DIR}/usr/local/bin/launch-yt.sh"
     install -m 0755 "${DESKTOP_REPO}/scripts/stage-share-apps.sh" "${TARGET_DIR}/usr/local/bin/stage-share-apps.sh"
-    install -m 0755 "${DESKTOP_REPO}/scripts/launch-mtpaint.sh"   "${TARGET_DIR}/usr/local/bin/mtpaint"
+    install -m 0755 "${DESKTOP_REPO}/scripts/launch-mtpaint.sh" "${TARGET_DIR}/usr/local/bin/mtpaint"
 fi
 
 # 4. Ensure init hooks & scripts are executable
