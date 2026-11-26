@@ -10,11 +10,10 @@ EROFS_PREV="${BINARIES_DIR}/rootfs.erofs.prev"
 BOOT_IMG="${BINARIES_DIR}/boot.vfat"
 SHARE_IMG="${BINARIES_DIR}/share.ext4"
 
-# Optional target hint: 64g | 128g | universal (default)
 FIT_PROFILE="${FIT_PROFILE:-universal}"
 MAX_EROFS_KB=524288
+WARN_TARGET_KB=786432
 BOOT_PART_MIB=4096
-# Compact build-time SHARE image; expand to fill 64 GB (~55.6G) or 128 GB on target
 SHARE_PART_MIB="${SHARE_PART_MIB:-2048}"
 
 case "${FIT_PROFILE}" in
@@ -46,7 +45,13 @@ if [ ! -f "${BOARD_DIR}/limine.conf" ]; then
     exit 1
 fi
 
-# Rotate prior EROFS image for A/B fallback
+TARGET_KB=$(du -sk "${TARGET_DIR}" | cut -f1)
+echo "[Piccolo-AX] Uncompressed target/ size: ${TARGET_KB} KB (budget target rootfs.erofs <= ${MAX_EROFS_KB} KB)"
+if [ "${TARGET_KB}" -gt "${WARN_TARGET_KB}" ]; then
+    echo "[Piccolo-AX][WARN] target/ (${TARGET_KB} KB) is heavy; review optional packages if EROFS exceeds ${MAX_EROFS_KB} KB."
+    du -ah "${TARGET_DIR}" | sort -rh | head -n 15
+fi
+
 if [ -f "${EROFS_OUT}" ]; then
     cp -f "${EROFS_OUT}" "${EROFS_PREV}"
 fi
