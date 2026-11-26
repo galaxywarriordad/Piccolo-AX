@@ -955,3 +955,13 @@ else
 fi
 ```
 
+---
+
+## Ecosystem Implementation Roadmap & Raspberry Pi (aarch64) Integration
+
+### Optimized Multi-Phase Roadmap (Q1–Q4)
+
+* **Q1 — Core Persistence Architecture & No-Shutdown-Dependency Gate:** Implement atomic save state and config mutations written directly to `/userdata` (`SHARE`) via temporary file creation, `fsync`, and rename hooks so game progress and settings remain fully protected against power loss without relying on clean shutdown scripts.  
+* **Q2 — Unified `aarch64` Target, `ax.toram` Contract & RP1 Pinning:** Standardize Raspberry Pi 4B and Pi 5 support under a single Buildroot target utilizing an explicit `ax.toram=0|1` boot parameter to toggle RAM loading based on available physical memory. Enforce strict RP1 I/O controller and MSI IRQ pinning across Raspberry Pi 5 hardware blocks.  
+* **Q3 — Hardware Memory & Latency Gating, Stability Freeze Tag:** Enforce `>= 4 GB` RAM system checks alongside board-specific audio round-trip latency gates (4.00 ms on Pi 4B, 2.00 ms on Pi 5). Seal phase end with a formal stability freeze tag across all shared libraries.  
+* **Q4 — 11th-Gen AVX-512 / RPCS3-AX Showcase & Reproducible Releases:** Showcase high-performance AVX-512 optimizations for 11th-gen x86\_64 processors alongside RPCS3-AX emulation integration. Publish fully reproducible field release images and build scripts across all target boards.
