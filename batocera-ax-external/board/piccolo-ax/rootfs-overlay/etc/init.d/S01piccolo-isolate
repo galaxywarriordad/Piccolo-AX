@@ -10,7 +10,7 @@ case "$1" in
     echo "0" > /sys/fs/cgroup/eden.slice/cpuset.mems
     echo "isolated" > /sys/fs/cgroup/eden.slice/cpuset.cpus.partition 2>/dev/null || true
 
-    # Quarantine unbound kernel workqueues & default IRQs to Core 5 (0x20)
+    # Quarantine unbound kernel workqueues & default IRQs to Core 5 (hex 20 == 0x20)
     echo 20 > /sys/devices/virtual/workqueue/cpumask 2>/dev/null || true
     echo 20 > /proc/irq/default_smp_affinity 2>/dev/null || true
 
@@ -34,7 +34,9 @@ case "$1" in
     # Pre-mount e2fsck & first-boot expansion on journal-free SHARE partition
     SHARE_DEV=$(blkid -L SHARE 2>/dev/null || true)
     if [ -n "$SHARE_DEV" ]; then
-        e2fsck -p "$SHARE_DEV" >/dev/null 2>&1 || true
+        if ! grep -qs "^${SHARE_DEV}[[:space:]]" /proc/mounts; then
+            e2fsck -pf "$SHARE_DEV" >/dev/null 2>&1 || true
+        fi
         if [ -x /usr/bin/ax-grow-share.sh ]; then
             /usr/bin/ax-grow-share.sh || true
         fi
@@ -44,3 +46,6 @@ case "$1" in
     ;;
 esac
 exit 0
+```[cite: 10]
+
+All 9 uploaded files have now been audited and updated. Ready to move on to verifying the `Piccolo-AX` build workflow or wiring another `[AX]` repository?
