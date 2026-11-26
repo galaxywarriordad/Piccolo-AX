@@ -4,10 +4,12 @@
 case "$1" in
   start)
     echo "[Piccolo-AX] Binding hardware IRQs & low-latency USB DAC parameters..."
-    mkdir -p /etc/modprobe.d
-    cat << 'EOF' > /etc/modprobe.d/piccolo-audio.conf
+    if [ -w /etc ]; then
+      mkdir -p /etc/modprobe.d
+      cat << 'EOF' > /etc/modprobe.d/piccolo-audio.conf
 options snd-usb-audio lowlatency=1
 EOF
+    fi
 
     # Initialize exclusive DAC lockfile directory & node
     mkdir -p /run/lock
@@ -17,18 +19,22 @@ EOF
 
     # Bind GTX 980 Ti MSI IRQ to Core 1 (0x02)
     for irq in $(grep -i "nvidia" /proc/interrupts 2>/dev/null | awk -F: '{print $1}' | tr -d ' '); do
+      if [ -n "$irq" ] && [ -w "/proc/irq/${irq}/smp_affinity" ]; then
         echo 02 > "/proc/irq/${irq}/smp_affinity" 2>/dev/null || true
+      fi
     done
 
     # Bind HiBy FC3 xHCI controller MSI IRQ to Core 0 (0x01)
     FC3_BUS=$(lsusb 2>/dev/null | grep -iE "2fc6|32bb|HiBy" | awk '{print $2}' | sed 's/^0*//' | head -n1)
-    if [ -n "$FC3_BUS" ] && [ -e "/sys/bus/usb/devices/usb${FC3_BUS}/../" ]; then
-        XHCI_PCI=$(basename "$(readlink -f "/sys/bus/usb/devices/usb${FC3_BUS}/../")" 2>/dev/null || true)
-        if [ -n "$XHCI_PCI" ]; then
-            for irq in $(grep -F "${XHCI_PCI}" /proc/interrupts 2>/dev/null | awk -F: '{print $1}' | tr -d ' '); do
-                echo 01 > "/proc/irq/${irq}/smp_affinity" 2>/dev/null || true
-            done
-        fi
+    if [ -n "$FC3_BUS" ] && [ -e "/sys/bus/usb/devices/usb${FC3_BUS}/.." ]; then
+      XHCI_PCI=$(basename "$(readlink -f "/sys/bus/usb/devices/usb${FC3_BUS}/..")" 2>/dev/null || true)
+      if [ -n "$XHCI_PCI" ]; then
+        for irq in $(grep -F "${XHCI_PCI}" /proc/interrupts 2>/dev/null | awk -F: '{print $1}' | tr -d ' '); do
+          if [ -n "$irq" ] && [ -w "/proc/irq/${irq}/smp_affinity" ]; then
+            echo 01 > "/proc/irq/${irq}/smp_affinity" 2>/dev/null || true
+          fi
+        done
+      fi
     fi
 
     # Enable NVIDIA persistence mode (580.* legacy branch)
@@ -37,16 +43,19 @@ EOF
     # Stage RAM tmpfs shader & PGO directories
     mkdir -p /dev/shm/emu_cache /dev/shm/nv_cache /dev/shm/pgo
 
-    # Only prepare /userdata rom/save mountpoints if SHARE / userdata is mounted, then mount SwitchHDD async on Core 5
+    # Only prepare /userdata rom/save mountpoints if /userdata is mounted, then mount SwitchHDD async on Core 5
     if grep -qs "[[:space:]]/userdata[[:space:]]" /proc/mounts; then
-        mkdir -p /userdata/roms/switch /userdata/roms/wiiu /userdata/roms/n64 /userdata/roms/snes /userdata/saves/snes
-        taskset -c 5 sh -c 'mount -L SwitchHDD -o ro,noatime /userdata/roms/switch 2>/dev/null || true' &
+      mkdir -p /userdata/roms/switch /userdata/roms/wiiu /userdata/roms/n64 /userdata/roms/snes /userdata/saves/snes
+      taskset -c 5 sh -c 'mount -L SwitchHDD -o ro,noatime /userdata/roms/switch 2>/dev/null || true' &
     fi
     ;;
   stop)
     if [ -x /etc/init.d/K01piccolo-sync ]; then
-        /etc/init.d/K01piccolo-sync save >/dev/null 2>&1 || true
+      /etc/init.d/K01piccolo-sync stop >/dev/null 2>&1 || true
     fi
     ;;
 esac
 exit 0
+```[cite: 9, 11]
+
+Would you like to upload another file for audit or check the `Piccolo-AX` build/release workflow next?
