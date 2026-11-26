@@ -39,15 +39,16 @@ jobs:
           printf 'DUMMY_SNES_ROM' > /tmp/piccolo_ci_cli/demo.sfc
 
           cat <<'EOF' > /tmp/piccolo_ci_cli/ax_engine.ini
-[snes]
-enabled = true
-engine_backend = "bsnes"
-profile_preset = "stock_cycle_exact"
-audio_filter_mode = "default"
-shm_staging_enabled = false
-dac_lock_path = "/tmp/piccolo_ci_cli/ax-dac.lock"
-persistent_save_dir = "/tmp/piccolo_ci_cli/saves"
-EOF
+          cat <<'EOF' > /tmp/piccolo_ci_cli/ax_engine.ini
+          [snes]
+          enabled = true
+          engine_backend = "bsnes"
+          profile_preset = "stock_cycle_exact"
+          audio_filter_mode = "default"
+          shm_staging_enabled = false
+          dac_lock_path = "/tmp/piccolo_ci_cli/ax-dac.lock"
+          persistent_save_dir = "/tmp/piccolo_ci_cli/saves"
+          EOF
 
           set +e
           ./build/genx-snes-ax >/dev/null 2>&1
