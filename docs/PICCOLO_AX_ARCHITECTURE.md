@@ -6,9 +6,9 @@ The **AX Project** separates shared low-level C++20 silicon abstractions (`ax-sd
 
 ```
          +-------------------------------------------------------+
-         |                   ax-sdk (v1_36_2)                  |
-         |        (https://github.com/galaxywarriordad/ax-sdk)       |
-         | Shared C++20 Silicon Core, Dynamic SMT/CCX & 1:2:1   |
+         |                   ax-sdk (v1_36_2)                    |
+         |        (https://github.com/galaxywarriordad/ax-sdk)   |
+         | Shared C++20 Silicon Core, Dynamic SMT/CCX & 1:2:1    |
          |   Topology, Platform Shims, Telemetry & Master Specs  |
          +-------------------------------------------------------+
           /             /                       \                 \
